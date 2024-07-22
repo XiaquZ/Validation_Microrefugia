@@ -71,31 +71,49 @@ unique(veg_EU$layer)
 # [13] "s"   "k"   "b"   "m"   "b2"  "b1"
 class(veg_EU$layer)
 # Slect the layers that are not sure about. create a vector.
-LyrID <- c("H", "L", "ML", "HL", "FL", "s", "k", "b", "m", "b2", "b1")
-vegLyr <- veg_EU[grep(paste(LyrID, collapse = "|"),
-    veg_EU$layer,
-    value = TRUE
-), ]
+list_values <- c("L", "ML", "HL", "FL", "s", "k", "b", "m", "b2", "b1")
+
+veg_lyr <- subset(veg_EU,grepl(paste0(list_values, collapse = "|"), layer))
+
 # Select the herb layer (for the further analysis) and tree layer (for the calculation of forest canopy changes later on) of the plots
-vegherb <- filter(veg_EU, layer == "H") # herb layer (H)
-vegtree <- filter(vegdata_ForestREplot_EU, layer == "T") # tree layer (T)
+vegherb <- veg_EU[grep("H", veg_EU$layer), ] # herb layer (H)
+vegtree <- veg_EU[grep("T", veg_EU$layer), ] # tree layer (T)
+hist(vegherb$abundance)
+hist(vegtree$abundance)
+# Select the sites with abnormal abundance values.
+herb_abun <- subset(vegherb, vegherb$abundance > 5000)
+unique(herb_abun$abundance) #9999
 
-# Exclude missing values (values of 9999)
-vegdata_ForestREplot_herblayer <- filter(vegdata_ForestREplot_herblayer, abundance != 9999)
-vegdata_ForestREplot_treelayer <- filter(vegdata_ForestREplot_treelayer, abundance != 9999)
+tree_abun <- subset(vegtree, vegtree$abundance > 5000)
+unique(tree_abun$abundance) #9999 42737
 
-# Check for abnormal total cover of herb layer per plot sample by grouping per plot sample and calculating the sum per plot sample
-total_cover_herblayer <- vegdata_ForestREplot_herblayer %>%
-    group_by(sample) %>%
-    summarise(total_abundance = sum(abundance))
-total_cover_treelayer <- vegdata_ForestREplot_treelayer %>%
-    group_by(sample) %>%
-    summarise(total_cover = sum(abundance))
+# Exclude abnormal abundance values (values of 9999)
+vegherb <- subset(vegherb,vegherb$abundance < 5000)
+hist(vegherb$abundance) #all the abundance values between 0-100
+max(vegherb$abundance) #100
+
+vegtree <- subset(vegtree, vegtree$abundance < 5000)
+hist(vegtree$abundance) #all the abundance values between 0-100
+max(vegtree$abundance) #100
+
+# Check for abnormal total cover of herb layer per plot sample by 
+# grouping per plot sample and calculating the sum per plot sample
+library(dplyr)
+vegherb_totalC <- vegherb |> 
+  group_by(sample)|> 
+  summarise(total_cover = sum(abundance))
+
+max(vegherb_totalC$total_cover) #1980
+
+vegtree_totalC <- vegtree |> 
+  group_by(sample)|> 
+  summarise(total_cover = sum(abundance))
+max(vegtree_totalC$total_cover) #279.875
 
 # Add the total cover per plot to the vegetation data
 # This is only needed for the herb layer, since we in the tree layer we only work with the total cover while in the herb layer we work with individual abundances
-vegdata_ForestREplot_herblayer <- left_join(vegdata_ForestREplot_herblayer, total_cover_herblayer, by = "sample")
-
-# Plots with a total cover up to 300% were considered realistic, plots higher than that were filtered
-vegdata_ForestREplot_herblayer <- filter(vegdata_ForestREplot_herblayer, total_abundance <= 300)
-total_cover_treelayer <- filter(total_cover_treelayer, total_cover <= 300)
+vegherb <- left_join(vegherb, vegherb_totalC, by = "sample")
+vegtree <- left_join(vegtree, vegtree_totalC, by = "sample")
+#Save vegherb for the CIT calculation. Save the total tree cover data for later explanatory.
+save(vegherb, file = "I:/DATA/input/forestREplot/version3/EU_herbL.RData")
+save(vegtree_totalC, file = "I:/DATA/input/forestREplot/version3/EU_TreeL.RData")
