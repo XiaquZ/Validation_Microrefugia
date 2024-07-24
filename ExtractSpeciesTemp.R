@@ -28,9 +28,11 @@ hist(AbAl$value)
 
 # # Calculate the mean temperature per species for the maximum
 # temperature during the growing season
-# mean_maxTempGS <- data.frame(maxTempGS[, 1], rowMeans(maxTempGS[, 2:1001]))
-# colnames(mean_maxTempGS) <- c("species_name", "mean_maxTempGS")
-
+dim(maxTempGS)
+mean_maxT_Gs <- data.frame(maxTempGS[, 1], rowMeans(maxTempGS[, 2:1001]))
+colnames(mean_maxT_Gs) <- c("species_name", "mean_maxTGs")
+head(mean_maxT_Gs)
+save(mean_maxT_Gs, file = "I:/DATA/output/MeanMaxT_Gs.RData")
 # Calculate the minimum temperature during spring (March to May)
 # for the 1000 sampling points by calculating the average
 # minimum temperature for these months.
@@ -135,6 +137,7 @@ tadf <- spe_herb[dup_sp, ]
 save(spe_herb, file = "I:/DATA/input/forestREplot/version3/CleanHerbL.RData")
 
 #### Match with ClimPlant ####
+load("I:/DATA/input/forestREplot/version3/CleanHerbL.RData")
 sp_list <- data.frame(unique(spe_herb$species_name)) # 1441 obs
 colnames(sp_list)[1] <- "species_name"
 head(sp_list)
@@ -151,7 +154,7 @@ cidf <- mean_minTWin[ci, ] # ClimPlant includes Circaea intermedia.
 clim_ugent <- (1441 - 1168) / 1441
 ## There are 0.189 species in foresREplot not in the ClimPlants.
 
-#### Add ClimPlants mean Temp data to the forestREplot data.
+#### Add ClimPlants mean Temp data to the forestREplot data. ####
 # For the minimum temperature during spring
 herb_spr <- right_join(spe_herb, mean_minTSpr, by = "species_name")
 head(herb_spr)
@@ -159,13 +162,17 @@ head(herb_spr)
 herb_win <- right_join(spe_herb, mean_minTWin, by = "species_name")
 head(herb_win)
 # For the maximum temperature during growing season
-herb_maxTempGS <- right_join(vegdata_ForestREplot_herblayer, mean_maxTempGS, by = "species_name")
+herb_maxTGs <- right_join(spe_herb, mean_maxT_Gs, by = "species_name")
+
 # Save data
 save(herb_spr,
-  file = "I:/DATA/input/forestREplot/version3/HerbL_MmeanTspr.RData"
+    file = "I:/DATA/input/forestREplot/version3/HerbL_MminTspr.RData"
 )
 save(herb_win,
-  file = "I:/DATA/input/forestREplot/version3/HerbL_MmeanTwin.RData"
+    file = "I:/DATA/input/forestREplot/version3/HerbL_MminTwin.RData"
+)
+save(herb_maxTGs,
+    file = "I:/DATA/input/forestREplot/version3/HerbL_MmaxT_GS.RData"
 )
 
 # Displaying species response curves for illustration (one example here for minimum temperature during spring)
