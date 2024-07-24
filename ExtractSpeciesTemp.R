@@ -52,11 +52,13 @@ AbAl_sp <- AbAl_sp %>% pivot_longer(
     names_to = "site.nr"
 )
 hist(AbAl_sp$value)
+save(minT_Spr, file = "I:/DATA/output/minT_MAR2MAY.RData")
 
 # Calculate the mean temperature per species for the minimum temp spring.
 head(minT_Spr[, 2])
 mean_minTSpr <- data.frame(minT_Spr[, 1], rowMeans(minT_Spr[, 2:1001]))
 colnames(mean_minTSpr) <- c("species_name", "mean_minTempSpring")
+save(mean_minTSpr, file = "I:/DATA/output/MeanMinT_MAR2MAY.RData")
 
 # Calculate the minimum temperature during winter
 # (December to February) for the 1000 sampling points
@@ -67,10 +69,15 @@ minT_Win <- data.frame(
         minTempJanuary[, 2:1001] +
         minTempFebruary[, 2:1001]) / 3
 )
+colnames(minT_Win)[1] <- "species_name"
+minT_Win[1:5, 1:5]
+save(minT_Win, file = "I:/DATA/output/minT_Dec2Feb.RData")
 
 # Calculate the mean temperature per species for minT during winter
 mean_minTWin <- data.frame(minT_Win[, 1], rowMeans(minT_Win[, 2:1001]))
 colnames(mean_minTWin) <- c("species_name", "mean_minTempWinter")
+mean_minTWin[1:5, ]
+save(mean_minTWin, file = "I:/DATA/output/MeanMinT_Dec2Feb.RData")
 
 # Join the respective mean temperature per species with the forestREplot data,
 # right join here (join based on ClimPlant).
@@ -80,50 +87,98 @@ colnames(mean_minTWin) <- c("species_name", "mean_minTempWinter")
 
 # Q: There are 1168 understory species in ClimPlant and 1410 in forestREplot,
 # so ClimPlant covers 82,8% of forestREplot?
+load("I:/DATA/output/minT_MAR2MAY.RData")
+load("I:/DATA/output/MeanMinT_MAR2MAY.RData")
+load("I:/DATA/output/minT_Dec2Feb.RData")
+load("I:/DATA/output/MeanMinT_Dec2Feb.RData")
 load("I:/DATA/input/forestREplot/version3/EU_herbL.RData")
-sp.list <- data.frame(unique(vegherb$species_name))
-## This scripts can't exactly make the unique species name,
-## some of the species names contain space in the biginning...
 
-colnames(sp.list)[1] <- "species_name"
-sp.list <- sp.list[order(sp.list$species_name), ]
-sp.list <- data.frame(sp.list)
-colnames(sp.list)[1] <- "species_name_ugent"
-# split the name of species with space.
-spe_list <- sp.list |>
-    separate(species_name_ugent,
+
+# split the name of vegherb species with space and fix the 'x' in the species name.
+spe_herb <- vegherb |>
+    separate(species_name,
         c("genus", "species"),
-        extra = "drop", fill = "right"
+        extra = "merge",
+        fill = "right"
     )
-# first, remove the name contains extra space.
-spe_list <- spe_list[complete.cases(spe_list[ ,2]), ]
-spe_list$species_name <- paste(spe_list$genus, spe_list$species)
-spe_list <- spe_list[-c(1:2)]
-head(spe_list)
-# check the duplicate species name
-ta <- table(as.matrix(spe_list))
-ta <- ta[ta > 1] #26 duplicate species.
+## use 'extra=merge' to keep the extra elements in the second name.
 
-# there are 1300 species from forestREplot H. 1168 in ClimPlants.
-Re.climP <- right_join(spe_list, mean_minTSpr, by = "species_name")
-## 1194 obs in merge data, there are some species not in ClimPlants.
-check.df <- data.frame(unique(spe_list$species_name))
-# For the maximum temperature during growing season
-vegdata_mean_maxTempGS <- right_join(vegdata_ForestREplot_herblayer, mean_maxTempGS, by = "species_name")
+# Replace NA with a specific string
+spe_herb <- spe_herb |>
+    mutate(species = ifelse(is.na(species), "UnknownSp", species))
+spe_herb <- spe_herb[complete.cases(spe_herb[]), ]
+spe_herb$species_name <- paste(spe_herb$genus, spe_herb$species)
+spe_herb <- spe_herb[-c(2:3)]
+spe_herb <- spe_herb[, c(1, 5, 2, 3, 4)]
+head(spe_herb)
+tail(spe_herb)
+
+## Circaea intermedia  Prunus fruticans: hybride, add 'x' in the name.
+# For Circaea intermedia
+dup_sp <- grep("Circaea intermedia", spe_herb$species_name)
+tadf <- spe_herb[dup_sp, ]
+# spe_herb$species_name <- gsub(
+#     "Circaea intermedia", "Circaea x intermedia",
+#     spe_herb$species_name
+# )
+# dup_sp <- grep("Circaea x intermedia", spe_herb$species_name)
+# tadf <- spe_herb[dup_sp, ]
+# For Prunus fruticans
+dup_sp <- grep("Prunus fruticans", spe_herb$species_name)
+tadf <- spe_herb[dup_sp, ]
+# spe_herb$species_name <- gsub(
+#     "Prunus fruticans", "Prunus x fruticans",
+#     spe_herb$species_name
+# )
+# dup_sp <- grep("Prunus x fruticans", spe_herb$species_name)
+# tadf <- spe_herb[dup_sp, ]
+save(spe_herb, file = "I:/DATA/input/forestREplot/version3/CleanHerbL.RData")
+
+#### Match with ClimPlant ####
+sp_list <- data.frame(unique(spe_herb$species_name)) # 1441 obs
+colnames(sp_list)[1] <- "species_name"
+head(sp_list)
+
+# there are 1441 species from forestREplot H. 1168 in ClimPlants.
+Re.climP <- right_join(sp_list, mean_minTSpr, by = "species_name")
+# check hybride species
+pf <- grep("Prunus", mean_minTWin$species_name)
+pfdf <- mean_minTWin[pf, ] # No ClimPlant data for Prunus x fruticans.
+ci <- grep("Circaea intermedia", mean_minTWin$species_name)
+cidf <- mean_minTWin[ci, ] # ClimPlant includes Circaea intermedia.
+
+## 1168 obs in merge data, there are some species not in ClimPlants.
+clim_ugent <- (1441 - 1168) / 1441
+## There are 0.189 species in foresREplot not in the ClimPlants.
+
+#### Add ClimPlants mean Temp data to the forestREplot data.
 # For the minimum temperature during spring
-vegdata_mean_minTempSpring <- right_join(vegdata_ForestREplot_herblayer, mean_minTempSpring, by = "species_name")
+herb_spr <- right_join(spe_herb, mean_minTSpr, by = "species_name")
+head(herb_spr)
 # For the minimum temperature during winter
-vegdata_mean_minTempWinter <- right_join(vegdata_ForestREplot_herblayer, mean_minTempWinter, by = "species_name")
+herb_win <- right_join(spe_herb, mean_minTWin, by = "species_name")
+head(herb_win)
+# For the maximum temperature during growing season
+herb_maxTempGS <- right_join(vegdata_ForestREplot_herblayer, mean_maxTempGS, by = "species_name")
+# Save data
+save(herb_spr,
+  file = "I:/DATA/input/forestREplot/version3/HerbL_MmeanTspr.RData"
+)
+save(herb_win,
+  file = "I:/DATA/input/forestREplot/version3/HerbL_MmeanTwin.RData"
+)
 
 # Displaying species response curves for illustration (one example here for minimum temperature during spring)
-plot_minTempSpring <- data.frame(t(minTempSpring[, 2:1001])) # ggplot takes columns so invert dataframe first
-
+plot_min_spr <- data.frame(t(minT_Spr[, 2:1001]))
+# ggplot takes columns so invert dataframe first
+plot_min_spr
+library(ggplot2)
 # Example for the species response curve of Abies alba for the minimum temperature during spring
-ggplot(plot_minTempSpring, aes(plot_minTempSpring[, 1])) +
+ggplot(plot_min_spr, aes(plot_min_spr[, 1])) +
     geom_density(color = "black", lwd = 1.1, fill = "darkgreen", alpha = 0.4) +
     theme_bw() +
     ylab("Frequency of occurence") +
     xlab("Minimum temperature during spring (°C)") +
     ggtitle("Abies alba") +
     theme(plot.title = element_text(hjust = 0, size = 20)) +
-    geom_vline(aes(xintercept = mean(plot_minTempSpring[, 1])), linetype = "dashed", linewidth = 0.75) # adding mean as vertical dashed line
+    geom_vline(aes(xintercept = mean(plot_min_spr[, 1])), linetype = "dashed", linewidth = 0.75) # adding mean as vertical dashed line
