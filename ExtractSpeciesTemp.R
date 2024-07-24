@@ -16,6 +16,11 @@ minTempDecember <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempDec.csv")
 minTempJanuary <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempJan.csv")
 minTempFebruary <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempFeb.csv")
 
+# Monthly maximum temperatures during summer (June to August)
+maxT_Jun <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempJun.csv")
+maxT_Jul <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempJul.csv")
+maxT_Aug <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempAug.csv")
+
 # plotting the density of the temperature distribution of a species.
 class(minTempApril)
 AbAl <- minTempApril[1, ]
@@ -33,12 +38,14 @@ mean_maxT_Gs <- data.frame(maxTempGS[, 1], rowMeans(maxTempGS[, 2:1001]))
 colnames(mean_maxT_Gs) <- c("species_name", "mean_maxTGs")
 head(mean_maxT_Gs)
 save(mean_maxT_Gs, file = "I:/DATA/output/MeanMaxT_Gs.RData")
+
 # Calculate the minimum temperature during spring (March to May)
 # for the 1000 sampling points by calculating the average
 # minimum temperature for these months.
 ## check if species are in the same row.
 identical(minTempMarch[["X"]], minTempMay[["X"]]) # TRUE
 
+# For spring months 1000 plots.
 minT_Spr <- data.frame(
     minTempMarch[, 1],
     (minTempMarch[, 2:1001] +
@@ -62,9 +69,7 @@ mean_minTSpr <- data.frame(minT_Spr[, 1], rowMeans(minT_Spr[, 2:1001]))
 colnames(mean_minTSpr) <- c("species_name", "mean_minTempSpring")
 save(mean_minTSpr, file = "I:/DATA/output/MeanMinT_MAR2MAY.RData")
 
-# Calculate the minimum temperature during winter
-# (December to February) for the 1000 sampling points
-# by calculating the average minimum temperature for these months
+# Calculating the average minimum temperature in winter months
 minT_Win <- data.frame(
     minTempDecember[, 1],
     (minTempDecember[, 2:1001] +
@@ -81,14 +86,33 @@ colnames(mean_minTWin) <- c("species_name", "mean_minTempWinter")
 mean_minTWin[1:5, ]
 save(mean_minTWin, file = "I:/DATA/output/MeanMinT_Dec2Feb.RData")
 
+
+# Calculating the average maximum temperature in growing season
+maxT_summer <- data.frame(
+    maxT_Aug[, 1],
+    (maxT_Jun[, 2:1001] +
+        maxT_Jul[, 2:1001] +
+        maxT_Aug[, 2:1001]) / 3
+)
+
+colnames(maxT_summer)[1] <- "species_name"
+save(maxT_summer, file = "I:/DATA/output/preparation/maxT_summer.RData")
+
+# Calculate the mean temperature per species for max temp during summer.
+mean_maxT_summer <- data.frame(
+    maxT_summer[, 1],
+    rowMeans(maxT_summer[, 2:1001])
+)
+colnames(mean_maxT_summer) <- c("species_name", "mean_maxTSumm")
+save(mean_maxT_summer,
+    file = "I:/DATA/output/preparation/MeanMaxT_summer.RData"
+)
 # Join the respective mean temperature per species with the forestREplot data,
 # right join here (join based on ClimPlant).
 # We are interested in the species present
 # in the ClimPlant database.
 # (no temperature data for species only present in forestREplot)
 
-# Q: There are 1168 understory species in ClimPlant and 1410 in forestREplot,
-# so ClimPlant covers 82,8% of forestREplot?
 load("I:/DATA/output/minT_MAR2MAY.RData")
 load("I:/DATA/output/MeanMinT_MAR2MAY.RData")
 load("I:/DATA/output/minT_Dec2Feb.RData")
@@ -137,7 +161,7 @@ tadf <- spe_herb[dup_sp, ]
 save(spe_herb, file = "I:/DATA/input/forestREplot/version3/CleanHerbL.RData")
 
 #### Match with ClimPlant ####
-load("I:/DATA/input/forestREplot/version3/CleanHerbL.RData")
+load("I:/DATA/output/preparation/CleanHerbL.RData")
 sp_list <- data.frame(unique(spe_herb$species_name)) # 1441 obs
 colnames(sp_list)[1] <- "species_name"
 head(sp_list)
@@ -153,6 +177,7 @@ cidf <- mean_minTWin[ci, ] # ClimPlant includes Circaea intermedia.
 ## 1168 obs in merge data, there are some species not in ClimPlants.
 clim_ugent <- (1441 - 1168) / 1441
 ## There are 0.189 species in foresREplot not in the ClimPlants.
+# ClimPlant covers 81.1% forestREplot species.
 
 #### Add ClimPlants mean Temp data to the forestREplot data. ####
 # For the minimum temperature during spring
@@ -163,6 +188,8 @@ herb_win <- right_join(spe_herb, mean_minTWin, by = "species_name")
 head(herb_win)
 # For the maximum temperature during growing season
 herb_maxTGs <- right_join(spe_herb, mean_maxT_Gs, by = "species_name")
+# For the maximum temperature during summer
+herb_maxTSum <- right_join(spe_herb, mean_maxT_summer, by = "species_name")
 
 # Save data
 save(herb_spr,
@@ -174,7 +201,9 @@ save(herb_win,
 save(herb_maxTGs,
     file = "I:/DATA/input/forestREplot/version3/HerbL_MmaxT_GS.RData"
 )
-
+save(herb_maxTSum,
+    file = "I:/DATA/output/preparation/HerbL_MmaxT_Summer.RData"
+)
 # Displaying species response curves for illustration (one example here for minimum temperature during spring)
 plot_min_spr <- data.frame(t(minT_Spr[, 2:1001]))
 # ggplot takes columns so invert dataframe first
