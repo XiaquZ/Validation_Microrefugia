@@ -37,7 +37,7 @@ dim(maxTempGS)
 mean_maxT_Gs <- data.frame(maxTempGS[, 1], rowMeans(maxTempGS[, 2:1001]))
 colnames(mean_maxT_Gs) <- c("species_name", "mean_maxTGs")
 head(mean_maxT_Gs)
-save(mean_maxT_Gs, file = "I:/DATA/output/MeanMaxT_Gs.RData")
+save(mean_maxT_Gs, file = "I:/DATA/output/preparation/MeanMaxT_Gs.RData")
 
 # Calculate the minimum temperature during spring (March to May)
 # for the 1000 sampling points by calculating the average
@@ -168,7 +168,7 @@ head(sp_list)
 
 # there are 1441 species from forestREplot H. 1168 in ClimPlants.
 Re.climP <- right_join(sp_list, mean_minTSpr, by = "species_name")
-# check hybride species
+# check hybrid species
 pf <- grep("Prunus", mean_minTWin$species_name)
 pfdf <- mean_minTWin[pf, ] # No ClimPlant data for Prunus x fruticans.
 ci <- grep("Circaea intermedia", mean_minTWin$species_name)
