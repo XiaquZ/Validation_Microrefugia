@@ -1,9 +1,5 @@
 library(tidyverse)
 library(dplyr)
-load("I:/DATA/input/forestREplot/version3/plot_data.RData")
-colnames(plot_data)
-plot.lst <- unique(plot_data$plotID) # no duplicate plots.
-
 # load plot CIT data of different survey time.
 load("I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_maxTSummer.RData")
 load("I:/DATA/output/CITyearly/Base2Re2_maxt_Gs_1995s.RData")
@@ -29,4 +25,7 @@ plot_summer02$citPeryear1 <- plot_summer02$deltaCIT1 / plot_summer02$deltayear1
 plot_summer02$citPeryear2 <- plot_summer02$deltaCIT2 / plot_summer02$deltayear2
 hist(plot_summer02$citPeryear1)
 
-#### EXtract microclimate data.
+save(plot_summer02,
+    file = "I:/DATA/output/CITyearly/Base2Re2_maxt_Summer_1995s.RData"
+)
+#### EXtract microclimate data. 05_
