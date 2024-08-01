@@ -190,4 +190,3 @@ unique(no_na1995s$plotID)
 save(no_na1995s, file = "I:/DATA/output/CITyearly/Base2Re2_maxt_Gs_1995s.RData")
 ####Go to scripts 05_extractMicro.R to check the coordinators of the plots.####
 ####if the plots coordinators look normal, follow next scripts 04.2 .####
-

@@ -8,7 +8,7 @@ library(stringr)
 # Load the species temperature data
 load("I:/DATA/output/preparation/Replot_MmaxT_Summer.RData")
 
-# CIT based on the maximum temperature during the growing season
+# CIT based on the maximum temperature during summer
 cit_maxt_summ <- herb_maxTSum |>
     group_by(sample) |>
     summarise(
@@ -135,6 +135,6 @@ no_na <- plot_maxt_summ |>
 
 
 # Save data.
-save(plot_maxt_gs,
-    file = "I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_maxTGs.RData"
+save(plot_maxt_summ,
+    file = "I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_maxTSummer.RData"
 )
