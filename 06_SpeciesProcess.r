@@ -1,6 +1,6 @@
 library(dplyr)
 library(tidyverse)
-
+library(ggplot2)
 load("I:/DATA/input/forestREplot/version3/plot_data.RData")
 # Load data
 load("I:/DATA/output/preparation/CleanHerbL.RData")
@@ -16,11 +16,6 @@ list_plots <- c(
 species_proce <- species_proce[grepl(
     paste(list_plots, collapse = "|"),
     species_proce$sample
-), ]
-# Check the year of each survey.
-plot_data <- plot_data[grepl(
-    paste(list_plots, collapse = "|"),
-    plot_data$plotID
 ), ]
 
 # Split the sample name to keep the survey type of each plot.
@@ -56,41 +51,167 @@ species_proce <- subset(
 # and each species in the resurvey 2 a score of 2.
 species_proce$score <- ifelse(species_proce$surveyTyp == "R1", 1, 2)
 
-# The CIT data is now in long format, 
+# The CIT data is now in long format,
 # so first it needs to be converted to a wide format data frame
-# to separate the baseline surveys 
+# to separate the baseline surveys
 # and resurveys into separate columns for further calculations
 species_proce <- spread(species_proce, surveyTyp, score)
-
+anyNA(species_proce$R1)
 # All species that are not present in a certain survey get a score of 0
-scoring_species_processes["B"][is.na(scoring_species_processes["B"])] <- 0
-scoring_species_processes["R1"][is.na(scoring_species_processes["R1"])] <- 0
-scoring_species_processes["R2"][is.na(scoring_species_processes["R2"])] <- 0
-scoring_species_processes["R3"][is.na(scoring_species_processes["R3"])] <- 0
-scoring_species_processes["R4"][is.na(scoring_species_processes["R4"])] <- 0
-scoring_species_processes["R5"][is.na(scoring_species_processes["R5"])] <- 0
+species_proce$R1[is.na(species_proce$R1)] <- 0
+species_proce$R2[is.na(species_proce$R2)] <- 0
 
-# Join the scoring data frame with the CIT data frame (based on plotID) to calculate the score of the different processes
-# based on the latest resurvey for which there is CIT data
-# It does not matter which CIT we use for this, because we just want to know for which resurvey there is CIT data and this is the same for the three CITs
-scoring_species_processes <- left_join(scoring_species_processes, CIT_maxTempGS, by = "plotID")
+# Calculate species process score by substracting R1 from R2.
+species_proce$process <- species_proce$R2 - species_proce$R1
 
-# Calculate the species score for the different processes per plot by subtracting the score of the baseline survey with the score of the latest resurvey of that plot
-# This is again done with a nested ifelse statement
-# Explanation code: if there is a CIT value for resurvey 5 (is.na()==FALSE), then subtract score baseline survey from score resurvey 5.
-# If not (is.na()==TRUE), then see if there is a value for resurvey 4.
-# If this is the case, then subtract score baseline survey from score resurvey 4. If not, see if there is a value for resurvey 3
-# and continue to do this until all species per plot have a score based on the process they went through between the baseline survey and the latest resurvey
-scoring_species_processes$species_process_score <- ifelse(is.na(scoring_species_processes$R5_CIT_maxTempGS) == F,
-    scoring_species_processes$B - scoring_species_processes$R5,
-    ifelse(is.na(scoring_species_processes$R4_CIT_maxTempGS) == F,
-        scoring_species_processes$B - scoring_species_processes$R4,
-        ifelse(is.na(scoring_species_processes$R3_CIT_maxTempGS) == F,
-            scoring_species_processes$B - scoring_species_processes$R3,
-            ifelse(is.na(scoring_species_processes$R2_CIT_maxTempGS) == F,
-                scoring_species_processes$B - scoring_species_processes$R2,
-                scoring_species_processes$B - scoring_species_processes$R1
-            )
+# Add the species abundance data and the temperature data
+# from Climplant of both surveys to the data frame.
+load("I:/DATA/output/preparation/Replot_MmaxT_Summer.RData")
+
+# For maximum temperature during the summer.
+list_plots <- c(
+    "EU_080_", "EU_079_",
+    "EU_078_", "EU_076_"
+)
+species_summ <- herb_maxTSum[grepl(
+    paste(list_plots, collapse = "|"),
+    herb_maxTSum$sample
+), ]
+
+species_summ <- species_summ[, -3]
+
+# Split the sample name to keep the survey type of each plot.
+split_parts <- strsplit(species_summ$sample, "_")
+species_summ$first_three <- sapply(
+    split_parts,
+    function(x) paste(x[1], x[2], x[3], sep = "_")
+)
+species_summ$last_part <- sapply(split_parts, function(x) x[4])
+species_summ <- species_summ[, -1]
+head(species_summ)
+match("first_three", names(species_summ)) # get the column number
+species_summ <- species_summ[, c(5, 6, 1, 2, 4, 3)]
+head(species_summ)
+colnames(species_summ)[1] <- "plotID"
+colnames(species_summ)[2] <- "surveyTyp"
+
+# Only keep R1 and R2.
+list_values <- c(
+    "R1", "R2"
+)
+species_summ <- subset(
+    species_summ,
+    grepl(
+        paste0(list_values, collapse = "|"),
+        surveyTyp
+    )
+)
+
+# Convert data into wide format to category speices into baseline and resurvey.
+species_summ <- pivot_wider(
+    species_summ,
+    names_from = surveyTyp,
+    values_from = abundance
+)
+
+# Give the columns more clear names
+colnames(species_summ)[5:6] <- c("R1_abundance", "R2_abundance")
+head(species_summ)
+
+# Join the species scores with the abundance data and the
+# species temperature data from ClimPlant based on the plotIDs and species names
+out_1 <- anti_join(species_summ, species_proce,
+    by = c("plotID", "species_name")
+)
+out_2 <- anti_join(species_proce, species_summ,
+    by = c("plotID", "species_name")
+)
+output <- left_join(species_summ, species_proce,
+    by = c("plotID", "species_name")
+)
+## All the species in the forest Replot cannot all find their temperature values
+## in the ClimPlants. Species do not have temp values are in out_2.
+unique(output$process)
+# Split the species per plot into different data frames based on their sprocess
+sp_disappear <- output[grep("-1", output$process), ]
+sp_new <- output[grep("2", output$process), ]
+sp_remain <- subset(output, process == "1")
+
+# Now the CITs of the three different processes can be calculated
+
+# For the disappearing species (only present in the R1 survey)
+cit_disappear <- sp_disappear %>%
+    group_by(plotID) %>%
+    summarise(
+        CIT_disappear = weighted.mean(
+            mean_maxTSumm, R1_abundance,
+            na.rm = T
         )
     )
+
+# For the newly occurring species (only present in the resurvey 2)
+# calculate the CIT based on the abundance of the resurvey 2.
+cit_new <- sp_new %>%
+    group_by(plotID) %>%
+    summarise(
+        CIT_new = weighted.mean(
+            mean_maxTSumm, R2_abundance,
+            na.rm = T
+        )
+    )
+
+# For the remaining species (present in both R1 and R2 resurvey)
+sp_remain <- sp_remain[!is.na(sp_remain$R2_abundance), ]
+## remove plots without abundance data for R2.
+
+cit_remain <- sp_remain %>%
+    group_by(plotID) %>%
+    summarise(
+        CIT_remain = weighted.mean(
+            mean_maxTSumm, R2_abundance,
+            na.rm = T
+        )
+    )
+
+
+# Now the CITs per process will be compared  to the general CIT
+
+# By visually comparing the CITs based on the processes (as density plots)
+# and the general CIT for the baseline survey and the resurvey (mean as vertical lines)
+
+# Extract the CIT of R1 and R2.
+load("I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_maxTSummer.RData")
+
+plot_maxt_summ <- plot_maxt_summ[, c(1:4)]
+# For maximum temperature during the summer.
+list_plots <- c(
+    "EU_080_", "EU_079_",
+    "EU_078_", "EU_076_"
+)
+plot_maxt_summ <- plot_maxt_summ[grepl(
+    paste(list_plots, collapse = "|"),
+    plot_maxt_summ$sample
+), ]
+colnames(plot_maxt_summ)[1] <- "plotID"
+head(plot_maxt_summ)
+# Join the CITs of the three processes to combine them in one figure
+cit_all <- full_join(plot_maxt_summ, cit_disappear, by = "plotID")
+cit_all <- full_join(cit_all, cit_new, by = "plotID")
+cit_all <- full_join(cit_all, cit_remain, by = "plotID")
+cit_all <- cit_all[, -2]
+colnames(cit_all)[4:6] <- c("species_loss", "species_gain", "Change_abundance")
+head(cit_all)
+cit_all <- cit_all[complete.cases(cit_all), ]
+# Convert to wide data format to plot multiple density plots.
+cit_all02 <- pivot_longer(
+    cit_all,
+    cols = c("species_loss", "species_gain", "Change_abundance"),
+    names_to = "process",
+    values_to = "CIT"
+)
+colnames(cit_all02) <- c("plotID", "CIT_R1", "CIT_R2", "process", "processCIT")
+head(cit_all02)
+hist(cit_all$R2)
+save(cit_all,
+    file = "I:/DATA/output/SpeciesChanges/CIT_maxtSummer_SpeciesProcess.RData"
 )
