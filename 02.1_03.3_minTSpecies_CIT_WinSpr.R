@@ -8,26 +8,31 @@ identical(mean_minTSpr["species_name"], mean_minTWin["species_name"])
 # Calculate the mean temperature per species for minT during winter and spring.
 minT_species <- merge(mean_minTWin, mean_minTSpr, by = "species_name")
 minT_species$Mean_minTDec2May <- (
-    minT_species$mean_minTempWinter
-        + minT_species$mean_minTempSpring) / 2
+  minT_species$mean_minTempWinter
+    + minT_species$mean_minTempSpring) / 2
 minT_species <- minT_species[, -c(2, 3)]
+head(minT_species)
+save(minT_species,
+  file = "I:/DATA/output/CommunityInferredTemp/cit_minT_WinSpr.RData"
+)
 #### Match ClimPlant temperature with foresREplot ####
 load("I:/DATA/output/preparation/CleanHerbL.RData")
 #### Add ClimPlants mean Temp data to the forestREplot data. ####
 # For the minimum temperature during spring
 species_winspr <- right_join(spe_herb, minT_species, by = "species_name")
 head(species_winspr)
-# CIT based on the maximum temperature during the growing season
+# CIT based on the minimum temperature during winter and spring
 cit_mint_winspr <- species_winspr |>
   group_by(sample) |>
   summarise(
     cit_mint_winspr = weighted.mean(Mean_minTDec2May, abundance)
   )
+head(cit_mint_winspr)
 ##### Convert CIT data into one plot per row.####
 # Seperate baseline survey and resurvey into different columns.
 # (baseline survey B vs resurvey R1 to R5)
 
-##### For the maximum temperature during the growing season.####
+##### For the minimum temperature during the spring and winter.####
 
 # Get plot id and start with the baseline CIT.
 plot_mint <- cit_mint_winspr[grep("_B", cit_mint_winspr$sample), ]

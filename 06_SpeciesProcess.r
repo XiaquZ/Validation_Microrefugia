@@ -211,7 +211,10 @@ cit_all02 <- pivot_longer(
 )
 colnames(cit_all02) <- c("plotID", "CIT_R1", "CIT_R2", "process", "processCIT")
 head(cit_all02)
+
 hist(cit_all$R2)
+hist(cit_all$R1)
+hist(cit_all$species_loss)
 save(cit_all,
     file = "I:/DATA/output/SpeciesChanges/CIT_maxtSummer_SpeciesProcess.RData"
 )
