@@ -1,6 +1,6 @@
 library(dplyr)
 library(tidyverse)
-library(ggplot2)
+
 load("I:/DATA/input/forestREplot/version3/plot_data.RData")
 # Load data
 load("I:/DATA/output/preparation/CleanHerbL.RData")
@@ -137,7 +137,7 @@ sp_disappear <- output[grep("-1", output$process), ]
 sp_new <- output[grep("2", output$process), ]
 sp_remain <- subset(output, process == "1")
 
-# Now the CITs of the three different processes can be calculated
+#### Now the CITs of the three different processes can be calculated ####
 
 # For the disappearing species (only present in the R1 survey)
 cit_disappear <- sp_disappear %>%
@@ -174,7 +174,7 @@ cit_remain <- sp_remain %>%
     )
 
 
-# Now the CITs per process will be compared  to the general CIT
+#### CITs species process will be compared  to the general CIT ####
 
 # By visually comparing the CITs based on the processes (as density plots)
 # and the general CIT for the baseline survey and the resurvey (mean as vertical lines)
@@ -201,7 +201,7 @@ cit_all <- full_join(cit_all, cit_remain, by = "plotID")
 cit_all <- cit_all[, -2]
 colnames(cit_all)[4:6] <- c("species_loss", "species_gain", "Change_abundance")
 head(cit_all)
-cit_all <- cit_all[complete.cases(cit_all), ]
+cit_all_nona <- cit_all[complete.cases(cit_all), ]
 # Convert to wide data format to plot multiple density plots.
 cit_all02 <- pivot_longer(
     cit_all,
@@ -215,3 +215,4 @@ hist(cit_all$R2)
 save(cit_all,
     file = "I:/DATA/output/SpeciesChanges/CIT_maxtSummer_SpeciesProcess.RData"
 )
+load("I:/DATA/output/SpeciesChanges/CIT_maxtSummer_SpeciesProcess.RData")
