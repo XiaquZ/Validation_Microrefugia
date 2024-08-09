@@ -113,7 +113,7 @@ anyNA(plot_mint$baseline)
 
 # Note that this is from baseline to R2.
 # Remove plots EU_078_30_B, which only has R2.
-plot_mint <- plot_mint[-grep("EU_078_30", plot_mint$sample),]
+plot_mint <- plot_mint[-grep("EU_078_30", plot_mint$sample), ]
 # Remove plots that only has baseline but don't have resurveys.
 plot_mint <- plot_mint[
   !with(plot_mint, is.na(plot_mint$R1) &
@@ -164,9 +164,9 @@ plot_mint02$deltayear_br2 <- plot_mint02$year_resurvey_R2 -
 head(plot_mint02)
 
 # CIT changes per year
-plot_mint02$cit_yr1 <- plot_mint02$deltaCIT1/plot_mint02$deltayear1
-plot_mint02$cit_yr2 <- plot_mint02$deltaCIT2/plot_mint02$deltayear2
-plot_mint02$cit_yrbr2 <- plot_mint02$deltaCITbr2/plot_mint02$deltayear_br2
+plot_mint02$cit_yr1 <- plot_mint02$deltaCIT1 / plot_mint02$deltayear1
+plot_mint02$cit_yr2 <- plot_mint02$deltaCIT2 / plot_mint02$deltayear2
+plot_mint02$cit_yrbr2 <- plot_mint02$deltaCITbr2 / plot_mint02$deltayear_br2
 hist(plot_mint02$cit_yr1)
 hist(plot_mint02$cit_yrbr2)
 
@@ -174,15 +174,88 @@ hist(plot_mint02$cit_yrbr2)
 # we can only used the CIT from baseline to the R2 surveys.
 # For these three sites, there are no resurveys later than R2.
 
-# 
-plot2000s_R1 <- plot_data %>%
-  mutate(year_baseline_survey = as.numeric(year_baseline_survey)) %>%
-  filter(year_baseline_survey >= 2000)
+#### Check if there are any plots with R1 later than 2000 can be added####
+# So the R1 become the baseline survey here.
+class(plot_data$year_resurvey_R1)
+plot2000s_r1 <- plot_data %>%
+  mutate(year_resurvey_R1 = as.numeric(year_resurvey_R1)) %>%
+  filter(year_resurvey_R1 >= 2000)
+plot2000s_r1 <- plot2000s_r1[, -c(6:8, 15:16)]
+plot2000s_r1 <- plot2000s_r1[, -6]
+# If R2 to R5 are all NA, then remove this row.
+plot2000s_r1 <- plot2000s_r1 |>
+  filter(!if_all(year_resurvey_R2:year_resurvey_R5, is.na))
 
-unique(plot2000s_b$plotID)
+head(plot2000s_r1)
 
+#### Calculate the changes of CIT in each plot. ####
+load("I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_minTWinSpr.RData")
+# Select the cit of the selected plots and remove the baseline.
+plot_mint <- plot_mint[, -2]
+colnames(plot_mint)[1] <- "plotID"
+head(plot_mint)
+plot2000s_r1 <- merge(plot2000s_r1, plot_mint, by = "plotID")
 
+# Use the R1 as baseline survey and the most recent survey as resurvey.
+resurvey_cit <- plot2000s_r1[, c(1, 6:10)]
+head(resurvey_cit)
+str(resurvey_cit)
+anyNA(resurvey_cit$year_resurvey_R1) # F
+# Convert the year to numeric
+cols <- colnames(resurvey_cit)[3:6]
+resurvey_cit[cols] <- sapply(resurvey_cit[cols], as.numeric)
+str(resurvey_cit)
 
+# Create a column that contain the most recent survey year.
+resurvey_cit$final_survey <- ifelse(
+  rowSums(!is.na(resurvey_cit[, 2:6])) > 1,
+  pmax(resurvey_cit$year_resurvey_R2,
+    resurvey_cit$year_resurvey_R3,
+    resurvey_cit$year_resurvey_R4,
+    resurvey_cit$year_resurvey_R5,
+    na.rm = TRUE
+  ),
+  resurvey_cit$year_resurvey_R2
+)
+head(resurvey_cit)
+
+# Calculate the delta year.
+match("R1", names(plot2000s_r1))
+resurvey_cit$cit_r1 <- plot2000s_r1[, 11]
+head(resurvey_cit)
+anyNA(resurvey_cit$final_survey)
+match("cit_recent", names(resurvey_cit))
+resurvey_cit <- resurvey_cit[, -9]
+
+# Make a category column of resurvey.
+resurvey_cit$recent <- ifelse(
+  resurvey_cit$final_survey == resurvey_cit$year_resurvey_R2, "R2",
+  ifelse(
+    resurvey_cit$final_survey == resurvey_cit$year_resurvey_R3, "R3",
+    ifelse(
+      resurvey_cit$final_survey == resurvey_cit$year_resurvey_R4, "R4",
+      "R5"
+    )
+  )
+)
+unique(resurvey_cit$recent)
+##Why there are NA when it should be "R4"?
+
+# Calculate the delta year between R1 and recent one.
+resurvey_cit$deltayr <- resurvey_cit$final_survey -
+  resurvey_cit$year_resurvey_R1
+head(resurvey_cit)
+# Check the data with NA in the recent column after the ifelse.
+x <- which(is.na(resurvey_cit$recent), arr.ind = TRUE)
+resurvey_cit[x, ] # all the data contain NA in the recent are belong to R4.
+resurvey_cit <- resurvey_cit %>%
+  mutate(recent = replace_na(recent, "R4"))
+head(resurvey_cit)
+unique(resurvey_cit$recent) # Corrected the NA to "R4".
+
+# Match the plot minimum temp cit values to the resurvey
+# first extract the resurvey cit and convert to long format with plot ID.
+str(resurvey_cit)
 
 
 #### Extract microclimate data. ####
@@ -195,9 +268,9 @@ plots_xy <- plot_mint02[, c(1:3)]
 
 # Convert data frame to sf object
 plots_sf <- st_as_sf(
-    x = plots_xy,
-    coords = c("longitude", "latitude"),
-    crs = "+proj=longlat +datum=WGS84"
+  x = plots_xy,
+  coords = c("longitude", "latitude"),
+  crs = "+proj=longlat +datum=WGS84"
 )
 mapview(plots_sf)
 
@@ -216,15 +289,15 @@ cor.test(micro_cit$mean, micro_cit$cit_yr1)
 plot(micro_cit$mean, micro_cit$cit_yr1)
 
 # Make density plots
-gplot_cit <- micro_cit[ , c(16:18)]
-#Melt
+gplot_cit <- micro_cit[, c(16:18)]
+# Melt
 melt_cit <- pivot_longer(gplot_cit, cols = names(gplot_cit))
 colnames(melt_cit) <- c("Survey", "CITperYr")
 head(melt_cit)
 library(ggplot2)
 # With transparency (right)
-ggplot(melt_cit, aes(x=CITperYr, color = Survey, fill = Survey)) +
-    geom_density(adjust=1.5, alpha=.4) 
-mean(gplot_cit$cit_yr1) #0.00752557
+ggplot(melt_cit, aes(x = CITperYr, color = Survey, fill = Survey)) +
+  geom_density(adjust = 1.5, alpha = .4)
+mean(gplot_cit$cit_yr1) # 0.00752557
 mean(gplot_cit$cit_yr2, na.rm = TRUE) # 0.05656997
-mean(gplot_cit$cit_yrbr2, na.rm = T) #0.0226431
+mean(gplot_cit$cit_yrbr2, na.rm = T) # 0.0226431
