@@ -16,7 +16,7 @@ str(plot_data)
 class(plot_data$year_baseline_survey)
 plot2000s_b <- plot_data %>%
   mutate(year_baseline_survey = as.numeric(year_baseline_survey)) %>%
-  filter(year_baseline_survey >= 2000)
+  filter(year_baseline_survey >= 1958)
 
 unique(plot2000s_b$plotID)
 ## note that EU_080 has plots with baseline older than 2000.
@@ -256,19 +256,44 @@ unique(resurvey_cit$recent) # Corrected the NA to "R4".
 # Match the plot minimum temp cit values to the resurvey
 # first extract the resurvey cit and convert to long format with plot ID.
 str(resurvey_cit)
+match("R2", names(plot2000s_r1))
+cit_r2r5 <- plot2000s_r1[,c(1, 12:15)]
+cit_r2r5_long <- pivot_longer(
+  cit_r2r5,
+  cols = -1,
+  names_to = "surveyTyp"
+  )
+colnames(resurvey_cit)[10] <- "surveyTyp"
+head(resurvey_cit)
+resurvey_cit <- merge(resurvey_cit, cit_r2r5_long, by = c("plotID", "surveyTyp"))
+colnames(resurvey_cit)[11] <- "cit_recent"
+head(resurvey_cit)
 
+# Calculate the CIT changes per year.
+resurvey_cit$deltaCIT <- resurvey_cit$cit_recent - resurvey_cit$cit_r1
+head(resurvey_cit)
+resurvey_cit$CITperYR <- resurvey_cit$deltaCIT/resurvey_cit$deltayr
+hist(resurvey_cit$CITperYR)
 
 #### Extract microclimate data. ####
 library(terra)
 library(sf)
 library(mapview)
 offset <- rast("E:/Output/ForestOffset/mean/mean_ForestTempMinOffset_V3.tif")
+load("I:/DATA/input/forestREplot/version3/plot_data.RData")
 
-plots_xy <- plot_mint02[, c(1:3)]
+head(plot_data)
+plots_xy <- plot_data[, c(1:3)]
+head(plots_xy)
+resurvey_citxy <- merge(resurvey_cit, plots_xy, by = "plotID")
+resurvey_citxy <- resurvey_citxy[, c(1, 13:15)]
+# Check for duplicate xy. Keep one and remove the rest.
+resurvey_citxy02 <- resurvey_citxy[!duplicated(resurvey_citxy[c(3,4)]),]
+head(resurvey_citxy02)
 
 # Convert data frame to sf object
 plots_sf <- st_as_sf(
-  x = plots_xy,
+  x = resurvey_citxy[,c(1,3:4)],
   coords = c("longitude", "latitude"),
   crs = "+proj=longlat +datum=WGS84"
 )
@@ -281,13 +306,24 @@ mapview(plots_st)
 plots_st <- vect(plots_st)
 plotsmicro <- extract(offset, plots_st, method = "simple", bind = T)
 plotsmicro <- as.data.frame(plotsmicro)
+head(plotsmicro)
 hist(plotsmicro$mean)
 
 # merge micro with CIT changes
-micro_cit <- merge(plot_mint02, plotsmicro, by = "plotID")
-cor.test(micro_cit$mean, micro_cit$cit_yr1)
-plot(micro_cit$mean, micro_cit$cit_yr1)
+micro_cit <- merge(resurvey_citxy, plotsmicro, by = "plotID")
+head(micro_cit)
+cor.test(micro_cit$mean, micro_cit$CITperYR)
+plot(micro_cit$mean, micro_cit$CITperYR)
 
+unique(resurvey_cit$surveyTyp)
+colnames(resurvey_cit)[2] <- "RecentSurveyTyp"
+head(resurvey_cit)
+resurvey_final <- merge(resurvey_citxy, resurvey_cit, by = "plotID")
+head(resurvey_final)
+resurvey_final <- resurvey_final[, -16]
+colnames(resurvey_final)[2] <- "CITperYr"
+save(resurvey_final, 
+file = "I:/DATA/output/temp/R1toR5_CITperYr_2000s_mint.RData")
 # Make density plots
 gplot_cit <- micro_cit[, c(16:18)]
 # Melt
