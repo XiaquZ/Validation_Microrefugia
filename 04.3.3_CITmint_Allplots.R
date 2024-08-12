@@ -2,9 +2,10 @@
 library(dplyr)
 library(tidyverse)
 
-load("I:/DATA/output/preparation/CleanHerbL.RData")
+# Plot data
 load("I:/DATA/input/forestREplot/version3/plot_data.RData")
 
+head(veg_data)
 min(plot_data$year_baseline_survey) # 1933
 max(plot_data$year_baseline_survey) # 2013
 min(plot_data$year_resurvey_R1) # 1969
@@ -12,23 +13,145 @@ max(plot_data$year_resurvey_R1) # 2023
 anyNA(plot1960s$year_baseline_survey) # F
 anyNA(plot1960s$year_resurvey_R1) # F
 str(plot_data)
-# check the year later than 2000.
-class(plot_data$year_baseline_survey)
-plot2000s_b <- plot_data %>%
-  mutate(year_baseline_survey = as.numeric(year_baseline_survey)) %>%
-  filter(year_baseline_survey >= 1958)
 
-unique(plot2000s_b$plotID)
-## note that EU_080 has plots with baseline older than 2000.
+# Only select plots with data in "H" and "T" layers.
+# Data cleaning already done in 01_CleanData.R.
+# Load the cleaned data. 
+load("I:/DATA/output/preparation/EU_TreeL.RData")
 
-# match("year_resurvey_R3", names(plot2000s_b))
-# plot2000s_b <- plot2000s_b[, -c(12:16)]
-# plot2000s_b <- plot2000s_b[, -c(6:8)]
-# anyNA(plot2000s_b$year_baseline_survey) # F
-# anyNA(plot2000s_b$year_resurvey_R1) # F
-# anyNA(plot2000s_b$year_resurvey_R2) # T
+# Calculate the change of total tree cover between surveys.
+# Remove plots with large change in the total cover.
+# Get plot id and start with the baseline survey.
+treecover <- vegtree_totalC[grep("_B", vegtree_totalC$sample), ]
+head(treecover)
+treecover$sample <- str_replace(treecover$sample, "_B", "")
+## get plotid.
+colnames(treecover)[2] <- "baseline_canopyCover"
+head(treecover)
 
-# get the CIT of plot 83.
+# Check which plots have first resurvey R1.
+r1 <- vegtree_totalC[grep("_R1", vegtree_totalC$sample), ] # 4072
+head(r1)
+colnames(r1)[2] <- "R1_canopyCover"
+r1$sample <- str_replace(r1$sample, "_R1", "") # get plotid.
+head(r1)
+# merge r1 data to the plot data.
+plot_treecover <- merge(treecover, r1, by = "sample", all = TRUE)
+## Some plots do not have baseline tree cover data but R1.
+head(plot_treecover)
+anyNA(plot_treecover$baseline_canopyCover)
+anyNA(plot_treecover$R1_canopyCover)
+
+
+# Check which plots have a second resurvey R2.
+r2 <- vegtree_totalC[grep("_R2", vegtree_totalC$sample), ] # 910 obs
+colnames(r2)[2] <- "R2_canopyCover"
+r2$sample <- str_replace(r2$sample, "_R2", "") # get plotid.
+head(r2)
+# merge r2 data to the r1 data.
+plot_treecover <- merge(plot_treecover, r2, by = "sample", all = TRUE)
+head(plot_treecover)
+
+# Check which plots have a resurvey R3.
+r3 <- vegtree_totalC[grep("_R3", vegtree_totalC$sample), ] # 713 obs
+head(r3)
+colnames(r3)[2] <- "R3_canopyCover"
+r3$sample <- str_replace(r3$sample, "_R3", "") # get plotid.
+head(r3)
+# merge r2 data to the r1 data.
+plot_treecover <- merge(plot_treecover, r3, by = "sample", all = TRUE)
+head(plot_treecover)
+
+# Check which plots have a resurvey R4.
+r4 <- vegtree_totalC[grep("_R4", vegtree_totalC$sample), ] # 493 obs
+head(r4)
+colnames(r4)[2] <- "R4_canopyCover"
+r4$sample <- str_replace(r4$sample, "_R4", "") # get plotid.
+head(r4)
+# merge data.
+plot_treecover <- merge(plot_treecover, r4, by = "sample", all = TRUE)
+head(plot_treecover)
+
+# Check which plots have a resurvey R5.
+r5 <- vegtree_totalC[grep("_R5", vegtree_totalC$sample), ] # 12 obs
+head(r5)
+colnames(r5)[2] <- "R5_canopyCover"
+r5$sample <- str_replace(r5$sample, "_R5", "") # get plotid.
+head(r4)
+# merge data.
+plot_treecover <- merge(plot_treecover, r5, by = "sample", all = TRUE)
+head(plot_treecover)
+
+# Split the tree cover data into time1 and time2.
+# Make a category column of time1.
+plot_treecover$time1 <- ifelse(
+  is.na(plot_treecover$baseline_canopyCover) == FALSE, 
+  plot_treecover$baseline_canopyCover,
+  ifelse(
+    is.na(plot_treecover$R1_canopyCover) == FALSE,
+    plot_treecover$R1_canopyCover,
+    ifelse(
+      is.na(plot_treecover$R2_canopyCover) == FALSE, 
+      plot_treecover$R2_canopyCover,
+      ifelse(
+        is.na(plot_treecover$R3_canopyCover) == FALSE,
+        plot_treecover$R3_canopyCover,
+        ifelse(
+          is.na(plot_treecover$R4_canopyCover) == FALSE,
+          plot_treecover$R4_canopyCover,
+          ifelse(
+            is.na(plot_treecover$R5_canopyCover) == FALSE,
+            plot_treecover$R5_canopyCover,
+            "Unknown"
+          )
+        )
+      )
+    )
+
+  )
+)
+# For the tree cover data of time2,
+# choose the cover data from the recent survey.
+plot_treecover$time2 <-  ifelse(
+  is.na(plot_treecover$R5_canopyCover) == FALSE, 
+  plot_treecover$R5_canopyCover,
+  ifelse(
+    is.na(plot_treecover$R4_canopyCover) == FALSE,
+    plot_treecover$R4_canopyCover,
+    ifelse(
+      is.na(plot_treecover$R3_canopyCover) == FALSE, 
+      plot_treecover$R3_canopyCover,
+      ifelse(
+        is.na(plot_treecover$R2_canopyCover) == FALSE,
+        plot_treecover$R2_canopyCover,
+        plot_treecover$R1_canopyCover
+          )
+        )
+      )
+    )
+str(plot_treecover)
+plot_treecover$time1 <- as.numeric(plot_treecover$time1)
+plot_treecover$canopyChange <- plot_treecover$time2 - plot_treecover$time1
+head(plot_treecover)
+hist(plot_treecover$canopyChange)
+
+# Select plots that with canopy cover changes less than 25 %.
+plot_treecover25 <- plot_treecover[
+  abs(plot_treecover$canopyChange) <= 25 &
+  !is.na(plot_treecover$canopyChange)
+,]
+# Remove plots that with only one tree cover data from baseline to R5.
+plot_treecover25 <- plot_treecover25[
+  rowSums(!is.na(plot_treecover25[,2:7])) > 1, 
+  ] #2501 plots can be included.
+save(plot_treecover25, file = "I:/DATA/output/temp/TreeCoverChangeLess25.RData")
+
+
+
+load("I:/DATA/output/preparation/CleanHerbL.RData")
+head(spe_herb)
+
+# get the CIT of plots.
 # load minimum temp data of each species.
 load("I:/DATA/output/CommunityInferredTemp/cit_minT_WinSpr.RData")
 
@@ -37,23 +160,7 @@ load("I:/DATA/output/CommunityInferredTemp/cit_minT_WinSpr.RData")
 species_winspr <- right_join(spe_herb, minT_species, by = "species_name")
 head(species_winspr)
 head(spe_herb)
-
-## grab the data of plot 078 079 083
-list_plots <- plot2000s_b$plotID
-species_b2000s <- species_winspr[grepl(
-  paste(list_plots, collapse = "|"),
-  species_winspr$sample
-), ]
-
-species_b2000s02 <- spe_herb[grepl(
-  paste(list_plots, collapse = "|"),
-  spe_herb$sample
-), ]
-## This output did not merge with ClimPlant
-## By comparing species_b2000s02 with species_b2000s
-## We can see how many species did not have temp data in Climplant.
-## Which might cause the missing CIT of one of the survey
-## as calculated below.
+## There are some species in forestREplot do not have temp data in climPlant.
 
 # Calculate the CIT
 cit_mint_b2000s <- species_b2000s |>
@@ -63,28 +170,8 @@ cit_mint_b2000s <- species_b2000s |>
   )
 head(cit_mint_b2000s)
 
-# Get plot id and start with the baseline CIT.
-cit_b2000s02 <- cit_mint_b2000s[grep("_B", cit_mint_b2000s$sample), ]
-## 109 plots has baseline later than 2000 from the 3 sites.
-cit_b2000s02$sample <- str_replace(cit_b2000s02$sample, "_B", "")
-## get plotid.
-colnames(cit_b2000s02)[2] <- "baseline"
-head(cit_b2000s02)
 
-# Check which plots have first resurvey R1.
-r1 <- cit_mint_b2000s[grep("_R1", cit_mint_b2000s$sample), ] # 105
-colnames(r1)[2] <- "R1"
-r1$sample <- str_replace(r1$sample, "_R1", "") # get plotid.
-head(r1)
 
-# merge r1 data to the plot data.
-anyNA(cit_b2000s02$baseline)
-plot_mint <- merge(cit_b2000s02, r1, by = "sample", all = TRUE)
-head(plot_mint)
-## 190 obs
-sum(is.na(plot_mint$baseline)) # 0 plots without baseline but have R1.
-sum(is.na(plot_mint$R1)) # 4 plots without R1 but have bseline.
-nobaseline <- plot_mint[is.na(plot_mint$R1), ] # 079 does not have R1.
 
 
 # Check which plots have a second resurvey R2.
