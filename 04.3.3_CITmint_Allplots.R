@@ -16,7 +16,7 @@ str(plot_data)
 
 # Only select plots with data in "H" and "T" layers.
 # Data cleaning already done in 01_CleanData.R.
-# Load the cleaned data. 
+# Load the cleaned data.
 load("I:/DATA/output/preparation/EU_TreeL.RData")
 
 # Calculate the change of total tree cover between surveys.
@@ -84,51 +84,31 @@ head(plot_treecover)
 
 # Split the tree cover data into time1 and time2.
 # Make a category column of time1.
-plot_treecover$time1 <- ifelse(
-  is.na(plot_treecover$baseline_canopyCover) == FALSE, 
-  plot_treecover$baseline_canopyCover,
-  ifelse(
-    is.na(plot_treecover$R1_canopyCover) == FALSE,
-    plot_treecover$R1_canopyCover,
-    ifelse(
-      is.na(plot_treecover$R2_canopyCover) == FALSE, 
-      plot_treecover$R2_canopyCover,
-      ifelse(
-        is.na(plot_treecover$R3_canopyCover) == FALSE,
-        plot_treecover$R3_canopyCover,
-        ifelse(
-          is.na(plot_treecover$R4_canopyCover) == FALSE,
-          plot_treecover$R4_canopyCover,
-          ifelse(
-            is.na(plot_treecover$R5_canopyCover) == FALSE,
-            plot_treecover$R5_canopyCover,
-            "Unknown"
-          )
-        )
-      )
+plot_treecover <- plot_treecover %>%
+  mutate(
+    time1 = case_when(
+      !is.na(baseline_canopyCover) ~ baseline_canopyCover,
+      !is.na(R1_canopyCover) ~ R1_canopyCover,
+      !is.na(R2_canopyCover) ~ R2_canopyCover,
+      !is.na(R3_canopyCover) ~ R3_canopyCover,
+      !is.na(R4_canopyCover) ~ R4_canopyCover,
+      !is.na(R5_canopyCover) ~ R5_canopyCover,
+      TRUE ~ "Unknown"
     )
-
   )
-)
 # For the tree cover data of time2,
 # choose the cover data from the recent survey.
-plot_treecover$time2 <-  ifelse(
-  is.na(plot_treecover$R5_canopyCover) == FALSE, 
-  plot_treecover$R5_canopyCover,
-  ifelse(
-    is.na(plot_treecover$R4_canopyCover) == FALSE,
-    plot_treecover$R4_canopyCover,
-    ifelse(
-      is.na(plot_treecover$R3_canopyCover) == FALSE, 
-      plot_treecover$R3_canopyCover,
-      ifelse(
-        is.na(plot_treecover$R2_canopyCover) == FALSE,
-        plot_treecover$R2_canopyCover,
-        plot_treecover$R1_canopyCover
-          )
-        )
-      )
+plot_treecover <- plot_treecover %>%
+  mutate(
+    time2 = case_when(
+      !is.na(R5_canopyCover) ~ R5_canopyCover,
+      !is.na(R4_canopyCover) ~ R4_canopyCover,
+      !is.na(R3_canopyCover) ~ R3_canopyCover,
+      !is.na(R2_canopyCover) ~ R2canopyCover,
+      TRUE ~ R1_canopyCover
     )
+  )
+
 str(plot_treecover)
 plot_treecover$time1 <- as.numeric(plot_treecover$time1)
 plot_treecover$canopyChange <- plot_treecover$time2 - plot_treecover$time1
@@ -138,249 +118,165 @@ hist(plot_treecover$canopyChange)
 # Select plots that with canopy cover changes less than 25 %.
 plot_treecover25 <- plot_treecover[
   abs(plot_treecover$canopyChange) <= 25 &
-  !is.na(plot_treecover$canopyChange)
-,]
+    !is.na(plot_treecover$canopyChange),
+]
 # Remove plots that with only one tree cover data from baseline to R5.
 plot_treecover25 <- plot_treecover25[
-  rowSums(!is.na(plot_treecover25[,2:7])) > 1, 
-  ] #2501 plots can be included.
-save(plot_treecover25, file = "I:/DATA/output/temp/TreeCoverChangeLess25.RData")
+  rowSums(!is.na(plot_treecover25[, 2:7])) > 1,
+] # 2501 plots can be included.
 
-
-
-load("I:/DATA/output/preparation/CleanHerbL.RData")
-head(spe_herb)
+plot(plot_treecover25$canopyChange)
 
 # get the CIT of plots.
-# load minimum temp data of each species.
-load("I:/DATA/output/CommunityInferredTemp/cit_minT_WinSpr.RData")
-
-#### Add ClimPlants mean Temp data to the forestREplot data. ####
-# For the minimum temperature during spring
-species_winspr <- right_join(spe_herb, minT_species, by = "species_name")
-head(species_winspr)
-head(spe_herb)
-## There are some species in forestREplot do not have temp data in climPlant.
-
-# Calculate the CIT
-cit_mint_b2000s <- species_b2000s |>
-  group_by(sample) |>
-  summarise(
-    cit_mint_b2000s = weighted.mean(Mean_minTDec2May, abundance)
-  )
-head(cit_mint_b2000s)
-
-
-
-
-
-# Check which plots have a second resurvey R2.
-r2 <- cit_mint_b2000s[grep("_R2", cit_mint_b2000s$sample), ] # 48
-colnames(r2)[2] <- "R2"
-r2$sample <- str_replace(r2$sample, "_R2", "") # get plotid.
-head(r2)
-
-# merge r2 data to the r1 data.
-plot_mint <- merge(plot_mint, r2, by = "sample", all = TRUE) # 110
-head(plot_mint)
-# check how many plots only have r2 cit data
-onlyr2 <- plot_mint[is.na(plot_mint$baseline) & is.na(plot_mint$R1), ] # 078_30
-## EU_078_30_B has species Spiraea douglasii. No R1 for this plot.
-## In R2, it has Sorbus aucuparia.
-spiraea <- minT_species[grep("Spiraea douglasii", minT_species$species_name), ]
-## Not included in ClimPlant.
-sorbus <- minT_species[grep("Sorbus aucuparia", minT_species$species_name), ]
-## Included in ClimPlant
-
-# Check which plots have a resurvey later than r2.
-r3 <- cit_mint_b2000s[grep("_R3", cit_mint_b2000s$sample), ] # 0
-r4 <- cit_mint_b2000s[grep("_R4", cit_mint_b2000s$sample), ] # 0
-r5 <- cit_mint_b2000s[grep("_R5", cit_mint_b2000s$sample), ] # 0
-anyNA(plot_mint$baseline)
-
-# Note that this is from baseline to R2.
-# Remove plots EU_078_30_B, which only has R2.
-plot_mint <- plot_mint[-grep("EU_078_30", plot_mint$sample), ]
-# Remove plots that only has baseline but don't have resurveys.
-plot_mint <- plot_mint[
-  !with(plot_mint, is.na(plot_mint$R1) &
-    is.na(plot_mint$R2)),
-]
-
-#### Calculate the deltaCIT and the deltaYear ####
-# First, add each survey year and xy to the plots.
-colnames(plot_mint)[1] <- "plotID"
-match("year_baseline_survey", names(plot_data)) # 9
-match("year_resurvey_R1", names(plot_data)) # 10
-plot_info <- plot_data[, c(1:3, 9:11)]
-plot_mint02 <- merge(plot_mint, plot_info,
-  by = "plotID",
-)
-plot_mint02 <- plot_mint02[, c(1, 5, 6, 2, 7, 3, 8, 4, 9)]
-head(plot_mint02)
-# Calculate the delta CIT.
-plot_mint02$deltaCIT1 <- plot_mint02$R1 - plot_mint02$baseline
-plot_mint02$deltaCIT2 <- plot_mint02$R2 - plot_mint02$R1
-sum(plot_mint02$deltaCIT1 > 0, na.rm = T) # 46
-sum(plot_mint02$deltaCIT2 > 0, na.rm = T) # 30
-plot_mint02$deltaCITbr2 <- plot_mint02$R2 - plot_mint02$baseline
-# Check if there are plots only contain baseline info.
-onlybase <- plot_mint02[
-  is.na(plot_mint02$year_resurvey_R1) &
-    is.na(plot_mint02$year_resurvey_R2),
-]
-## All the plots has at least one resurvey.
-
-# Calculate delta year.
-colsnum <- c(
-  "year_baseline_survey",
-  "year_resurvey_R1",
-  "year_resurvey_R2"
-)
-plot_mint02[colsnum] <- sapply(plot_mint02[colsnum], as.numeric)
-plot_mint02$deltayear1 <- plot_mint02$year_resurvey_R1 -
-  plot_mint02$year_baseline_survey
-head(plot_mint02)
-
-plot_mint02$deltayear2 <- plot_mint02$year_resurvey_R2 -
-  plot_mint02$year_resurvey_R1
-head(plot_mint02)
-
-plot_mint02$deltayear_br2 <- plot_mint02$year_resurvey_R2 -
-  plot_mint02$year_baseline_survey
-head(plot_mint02)
-
-# CIT changes per year
-plot_mint02$cit_yr1 <- plot_mint02$deltaCIT1 / plot_mint02$deltayear1
-plot_mint02$cit_yr2 <- plot_mint02$deltaCIT2 / plot_mint02$deltayear2
-plot_mint02$cit_yrbr2 <- plot_mint02$deltaCITbr2 / plot_mint02$deltayear_br2
-hist(plot_mint02$cit_yr1)
-hist(plot_mint02$cit_yrbr2)
-
-#### Conclusions: So for minT of winter and spring ####
-# we can only used the CIT from baseline to the R2 surveys.
-# For these three sites, there are no resurveys later than R2.
-
-#### Check if there are any plots with R1 later than 2000 can be added####
-# So the R1 become the baseline survey here.
-class(plot_data$year_resurvey_R1)
-plot2000s_r1 <- plot_data %>%
-  mutate(year_resurvey_R1 = as.numeric(year_resurvey_R1)) %>%
-  filter(year_resurvey_R1 >= 2000)
-plot2000s_r1 <- plot2000s_r1[, -c(6:8, 15:16)]
-plot2000s_r1 <- plot2000s_r1[, -6]
-# If R2 to R5 are all NA, then remove this row.
-plot2000s_r1 <- plot2000s_r1 |>
-  filter(!if_all(year_resurvey_R2:year_resurvey_R5, is.na))
-
-head(plot2000s_r1)
-
-#### Calculate the changes of CIT in each plot. ####
+# Load herb layer species cit data
 load("I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_minTWinSpr.RData")
-# Select the cit of the selected plots and remove the baseline.
-plot_mint <- plot_mint[, -2]
-colnames(plot_mint)[1] <- "plotID"
-head(plot_mint)
-plot2000s_r1 <- merge(plot2000s_r1, plot_mint, by = "plotID")
 
-# Use the R1 as baseline survey and the most recent survey as resurvey.
-resurvey_cit <- plot2000s_r1[, c(1, 6:10)]
-head(resurvey_cit)
-str(resurvey_cit)
-anyNA(resurvey_cit$year_resurvey_R1) # F
-# Convert the year to numeric
-cols <- colnames(resurvey_cit)[3:6]
-resurvey_cit[cols] <- sapply(resurvey_cit[cols], as.numeric)
-str(resurvey_cit)
+plot_tc02 <- plot_treecover25[, c(1, 10)] # 2501
+plot_tc02 <- merge(plot_tc02, plot_mint, by = "sample") # 2499
+## There are two plots do not have CIT from plot_mint. No ClimPlant data.
 
-# Create a column that contain the most recent survey year.
-resurvey_cit$final_survey <- ifelse(
-  rowSums(!is.na(resurvey_cit[, 2:6])) > 1,
-  pmax(resurvey_cit$year_resurvey_R2,
-    resurvey_cit$year_resurvey_R3,
-    resurvey_cit$year_resurvey_R4,
-    resurvey_cit$year_resurvey_R5,
-    na.rm = TRUE
-  ),
-  resurvey_cit$year_resurvey_R2
-)
-head(resurvey_cit)
+# If R1 to R5 are all NA, then remove this row.
+plot_tc02 <- plot_tc02 |>
+  filter(!if_all(R1:R5, is.na))
+head(plot_tc02) # 2490
 
-# Calculate the delta year.
-match("R1", names(plot2000s_r1))
-resurvey_cit$cit_r1 <- plot2000s_r1[, 11]
-head(resurvey_cit)
-anyNA(resurvey_cit$final_survey)
-match("cit_recent", names(resurvey_cit))
-resurvey_cit <- resurvey_cit[, -9]
+# Remove plots that with only one survey data from baseline to R5.
+plot_tc02 <- plot_tc02[
+  rowSums(!is.na(plot_tc02[, 3:8])) > 1,
+] # 2483
+anyNA(plot_tc02$baseline) # F
 
-# Make a category column of resurvey.
-resurvey_cit$recent <- ifelse(
-  resurvey_cit$final_survey == resurvey_cit$year_resurvey_R2, "R2",
-  ifelse(
-    resurvey_cit$final_survey == resurvey_cit$year_resurvey_R3, "R3",
-    ifelse(
-      resurvey_cit$final_survey == resurvey_cit$year_resurvey_R4, "R4",
-      "R5"
+# Use most recent survey as resurvey.
+# Create a column with cit of most recent survey.
+plot_tc02 <- plot_tc02 %>%
+  mutate(
+    Resurvey_cit = case_when(
+      !is.na(R5) ~ R5,
+      !is.na(R4) ~ R4,
+      !is.na(R3) ~ R3,
+      !is.na(R2) ~ R2,
+      TRUE ~ R1
     )
   )
-)
-unique(resurvey_cit$recent)
-## Why there are NA when it should be "R4"?
 
-# Calculate the delta year between R1 and recent one.
-resurvey_cit$deltayr <- resurvey_cit$final_survey -
-  resurvey_cit$year_resurvey_R1
-head(resurvey_cit)
-# Check the data with NA in the recent column after the ifelse.
-x <- which(is.na(resurvey_cit$recent), arr.ind = TRUE)
-resurvey_cit[x, ] # all the data contain NA in the recent are belong to R4.
-resurvey_cit <- resurvey_cit %>%
-  mutate(recent = replace_na(recent, "R4"))
-head(resurvey_cit)
-unique(resurvey_cit$recent) # Corrected the NA to "R4".
+anyNA(plot_tc02$Resurvey_cit)
 
-# Match the plot minimum temp cit values to the resurvey
-# first extract the resurvey cit and convert to long format with plot ID.
-str(resurvey_cit)
-match("R2", names(plot2000s_r1))
-cit_r2r5 <- plot2000s_r1[, c(1, 12:15)]
-cit_r2r5_long <- pivot_longer(
-  cit_r2r5,
-  cols = -1,
-  names_to = "surveyTyp"
-)
-colnames(resurvey_cit)[10] <- "surveyTyp"
-head(resurvey_cit)
-resurvey_cit <- merge(resurvey_cit, cit_r2r5_long, by = c("plotID", "surveyTyp"))
-colnames(resurvey_cit)[11] <- "cit_recent"
-head(resurvey_cit)
+# Add the baseline survey year
+head(plot_data)
+plotinfo <- plot_data[, c(1:3, 9:14)]
+head(plotinfo)
+colnames(plot_tc02)[1] <- "plotID"
+plot_tc02 <- merge(plot_tc02, plotinfo, by = "plotID")
+head(plot_tc02)
+str(plot_tc02)
 
-# Calculate the CIT changes per year.
-resurvey_cit$deltaCIT <- resurvey_cit$cit_recent - resurvey_cit$cit_r1
-head(resurvey_cit)
-resurvey_cit$CITperYR <- resurvey_cit$deltaCIT / resurvey_cit$deltayr
-hist(resurvey_cit$CITperYR)
+# Add the year of recent survey to a new column.
+plot_tc02 <- plot_tc02 %>%
+  mutate(
+    ResuveyYr = case_when(
+      Resurvey_cit == R1 ~ year_resurvey_R1,
+      Resurvey_cit == R2 ~ year_resurvey_R2,
+      Resurvey_cit == R3 ~ year_resurvey_R3,
+      Resurvey_cit == R4 ~ year_resurvey_R4,
+      TRUE ~ year_resurvey_R5
+    )
+  )
+
+head(plot_tc02)
+
+# Check for NA values in ResuveyYr
+sum(is.na(plot_tc02$ResuveyYr)) # 0
+sum(is.na(plot_tc02$year_baseline_survey)) # 0
+
+# View rows with NA to understand why they failed
+plot_tc02[is.na(plot_tc02$ResuveyYr), ]
+
+# Remove columns that are not going to be used.
+plot_tc02 <- plot_tc02[, -c(4:8, 13:17)]
+
+# Check the formatting of year.
+unique(plot_tc02$year_baseline_survey)
+
+# Use mutate and recode for a cleaner syntax.
+plot_tc02 <- plot_tc02 %>%
+  mutate(year_baseline_survey = recode(
+    year_baseline_survey,
+    "1976 (T, S 1975)" = "1976",
+    "1956-57" = "1957",
+    "1955 and 57" = "1956",
+    "1998/99" = "1999",
+    "1963?" = "1963"
+  ))
+
+unique(plot_tc02$year_baseline_survey)
+unique(plot_tc02$year_baseline_survey)
+sum(is.na(plot_tc02$ResuveyYr)) # 0
+str(plot_tc02)
+
+# Inspect the year data.
+# Assuming 'year_column' is your column name
+problematic_yr <- plot_tc02$ResuveyYr[is.na(as.numeric(plot_tc02$ResuveyYr))]
+problematic_yr01 <- plot_tc02$year_baseline_survey[
+  is.na(as.numeric(plot_tc02$year_baseline_survey))
+]
+print(problematic_yr)
+print(problematic_yr01)
+
+# Convert the year data
+plot_tc02$ResuveyYr <- gsub("2019-2020", "2020", plot_tc02$ResuveyYr)
+
+# Convert the survey years to numeric.
+cols <- c("ResuveyYr", "year_baseline_survey")
+plot_tc02[cols] <- lapply(plot_tc02[cols], as.numeric)
+
+# Check NA
+sum(is.na(plot_tc02$ResuveyYr))
+sum(is.na(plot_tc02$year_baseline_survey))
+
+# Calculate delta CIT and delta year between baseline and recent survey.
+plot_tc02 <- plot_tc02 |>
+  mutate(
+    deltaCIT = plot_tc02$Resurvey_cit - plot_tc02$baseline,
+    deltaYr = plot_tc02$ResuveyYr - plot_tc02$year_baseline_survey
+  )
+
+# Check for na values in delta cit.
+sum(is.na(plot_tc02$deltaCIT)) # 0
+sum(is.na(plot_tc02$deltaYr))
+head(plot_tc02)
+
+# Calculate CIT change per year.
+plot_tc02$CITperYr <- plot_tc02$deltaCIT / plot_tc02$deltaYr
 
 #### Extract microclimate data. ####
 library(terra)
 library(sf)
 library(mapview)
 offset <- rast("E:/Output/ForestOffset/mean/mean_ForestTempMinOffset_V3.tif")
-load("I:/DATA/input/forestREplot/version3/plot_data.RData")
 
-head(plot_data)
-plots_xy <- plot_data[, c(1:3)]
-head(plots_xy)
-resurvey_citxy <- merge(resurvey_cit, plots_xy, by = "plotID")
-resurvey_citxy <- resurvey_citxy[, c(1, 13:15)]
 # Check for duplicate xy. Keep one and remove the rest.
-resurvey_citxy02 <- resurvey_citxy[!duplicated(resurvey_citxy[c(3, 4)]), ]
-head(resurvey_citxy02)
+plot_tc02 <- plot_tc02[!duplicated(plot_tc02[c(5, 6)]), ]
+head(plot_tc02)
 
 # Convert data frame to sf object
 plots_sf <- st_as_sf(
-  x = resurvey_citxy[, c(1, 3:4)],
+  x = plot_tc02[, c(1, 5:6)],
+  coords = c("longitude", "latitude"),
+  crs = "+proj=longlat +datum=WGS84"
+)
+mapview(plots_sf)
+## Plot 082 have wrong xy, should be the opposite.
+
+# Switch the xy of plot 082.
+i <- which(str_starts(plot_tc02$plotID, "^EU_082_"))
+x <- plot_tc02$latitude[i]
+y <- plot_tc02$longitude[i]
+plot_tc02$latitude[i] <- y
+plot_tc02$longitude[i] <- x
+
+# Convert data frame to sf object
+plots_sf <- st_as_sf(
+  x = plot_tc02[, c(1, 5:6)],
   coords = c("longitude", "latitude"),
   crs = "+proj=longlat +datum=WGS84"
 )
@@ -397,33 +293,31 @@ head(plotsmicro)
 hist(plotsmicro$mean)
 
 # merge micro with CIT changes
-micro_cit <- merge(resurvey_citxy, plotsmicro, by = "plotID")
+micro_cit <- merge(plot_tc02, plotsmicro, by = "plotID")
 head(micro_cit)
-cor.test(micro_cit$mean, micro_cit$CITperYR)
-plot(micro_cit$mean, micro_cit$CITperYR)
+cor.test(micro_cit$mean, micro_cit$CITperYr)
+plot(micro_cit$mean, micro_cit$CITperYr)
+plot(micro_cit$canopyChange, micro_cit$mean)
 
-unique(resurvey_cit$surveyTyp)
-colnames(resurvey_cit)[2] <- "RecentSurveyTyp"
-head(resurvey_cit)
-resurvey_final <- merge(resurvey_citxy, resurvey_cit, by = "plotID")
-head(resurvey_final)
-resurvey_final <- resurvey_final[, -16]
-colnames(resurvey_final)[2] <- "CITperYr"
-
-save(resurvey_final,
-  file = "I:/DATA/output/temp/R1toR5_CITperYr_2000s_mint.RData"
+# Save data.
+save(micro_cit,
+  file = "I:/DATA/output/extraMicro/MinToffset_CITperYr_allPlots.RData"
 )
 
-# Make density plots
-gplot_cit <- micro_cit[, c(16:18)]
-# Melt
-melt_cit <- pivot_longer(gplot_cit, cols = names(gplot_cit))
-colnames(melt_cit) <- c("Survey", "CITperYr")
-head(melt_cit)
-library(ggplot2)
-# With transparency (right)
-ggplot(melt_cit, aes(x = CITperYr, color = Survey, fill = Survey)) +
-  geom_density(adjust = 1.5, alpha = .4)
-mean(gplot_cit$cit_yr1) # 0.00752557
-mean(gplot_cit$cit_yr2, na.rm = TRUE) # 0.05656997
-mean(gplot_cit$cit_yrbr2, na.rm = T) # 0.0226431
+# linear trend + confidence interval
+library(hrbrthemes)
+library(ggpubr)
+
+gplot_df <- micro_cit[sample(nrow(micro_cit), 1000), ]
+
+ggplot(gplot_df, aes(x=mean, y=CITperYr)) + 
+  geom_point()+
+  ggtitle("Minimum temperature offset and CIT change per year") +
+  labs(y= "CIT change per year (MinT)", x = "Microclimate offset (MinT)") +
+  geom_smooth(method = lm, color="#482EDB", fill="#69b3a2", se=TRUE) +
+  stat_cor(p.accuracy = 0.001, r.accuracy = 0.01) +
+  theme_bw() + guides(color = 'none')
+
+# View rows with large CIT.
+largecit <- micro_cit[(micro_cit$CITperYr > 0.4), ]
+largecit <- micro_cit[(micro_cit$CITperYr < -0.2), ]
