@@ -1,6 +1,7 @@
 # Load data
 library(dplyr)
 library(tidyverse)
+library(ggeffects)
 
 # Plot data
 load("I:/DATA/input/forestREplot/version3/plot_data.RData")
@@ -252,6 +253,7 @@ plot_tc02$CITperYr <- plot_tc02$deltaCIT / plot_tc02$deltaYr
 library(terra)
 library(sf)
 library(mapview)
+
 offset <- rast("E:/Output/ForestOffset/mean/mean_ForestTempMinOffset_V3.tif")
 
 # Check for duplicate xy. Keep one and remove the rest.
@@ -305,19 +307,115 @@ save(micro_cit,
 )
 
 # linear trend + confidence interval
-library(hrbrthemes)
 library(ggpubr)
+library(ggplot2)
 
 gplot_df <- micro_cit[sample(nrow(micro_cit), 1000), ]
 
-ggplot(gplot_df, aes(x=mean, y=CITperYr)) + 
-  geom_point()+
+ggplot(gplot_df, aes(x = mean, y = CITperYr)) +
+  geom_point() +
   ggtitle("Minimum temperature offset and CIT change per year") +
-  labs(y= "CIT change per year (MinT)", x = "Microclimate offset (MinT)") +
-  geom_smooth(method = lm, color="#482EDB", fill="#69b3a2", se=TRUE) +
+  labs(y = "CIT change per year (MinT)", x = "Microclimate offset (MinT)") +
+  geom_smooth(method = lm, color = "#482EDB", fill = "#69b3a2", se = TRUE) +
   stat_cor(p.accuracy = 0.001, r.accuracy = 0.01) +
-  theme_bw() + guides(color = 'none')
+  theme_bw() +
+  guides(color = "none")
 
 # View rows with large CIT.
 largecit <- micro_cit[(micro_cit$CITperYr > 0.4), ]
 largecit <- micro_cit[(micro_cit$CITperYr < -0.2), ]
+
+# Extract the MI of velocity
+# Convert data frame to sf object
+velocity <- rast("E:/Output/MicrorefugiaIndex/MI_bvocc_75km_25m_add0.tif")
+
+plots_sf <- st_as_sf(
+  x = macro[, c(1, 5:6)],
+  coords = c("longitude", "latitude"),
+  crs = "+proj=longlat +datum=WGS84"
+)
+mapview(plots_sf)
+
+plots_st <- st_transform(plots_sf, crs = st_crs(velocity))
+mapview(plots_st)
+
+# Extract the microclimate values.
+plots_st <- vect(plots_st)
+plotsmicro <- extract(velocity, plots_st, method = "simple", bind = T)
+plotsmicro <- as.data.frame(plotsmicro)
+head(plotsmicro)
+colnames(plotsmicro)[2] <- "Backward_velocity"
+hist(plotsmicro$Backward_velocity)
+
+# merge micro with CIT changes
+micro_cit02 <- merge(micro_cit, plotsmicro, by = "plotID")
+head(micro_cit02)
+cor.test(micro_cit02$Backward_velocity, micro_cit02$CITperYr)
+plot(micro_cit02$Backward_velocity, micro_cit02$CITperYr)
+
+# Add macro data
+macro <- readRDS("I:/DATA/output/macro_diff.RDS")
+
+# Add the MI of velocity to the data.
+macro$MI_BV <- micro_cit02$Backward_velocity[
+  match(macro$plotID, micro_cit02$plotID)
+]
+head(macro)
+macro$MI_BV <- round(macro$MI_BV, digits = 1)
+
+# Test the relationship between deltaCIT and macro_diff first.
+lm_macro <- lm(deltaCIT ~ macro_diff, data = macro)
+summary(lm_macro)
+
+# Create the interaction and make the ggeffects plot.
+str(macro)
+colnames(macro)[16] <- "MI_FV"
+lm_bv <- lm(deltaCIT ~ macro_diff * MI_BV, data = macro)
+lm_fv <- lm(deltaCIT ~ macro_diff * MI_FV, data = macro)
+summary(lm_bv)
+hist(macro$MI_BV)
+p_vel <- ggpredict(lm_vel, c("macro_diff", "MI_BV [0.1, 0.5, 0.9]"))
+plot(p_vel)
+
+#### Add the MI of warming magnitude.####
+wm <- rast("E:/Output/MicrorefugiaIndex/MI_WarmingMagnitude.tif")
+plots_sf <- st_as_sf(
+  x = macro[, c(1, 5:6)],
+  coords = c("longitude", "latitude"),
+  crs = "+proj=longlat +datum=WGS84"
+)
+mapview(plots_sf)
+# Transform the crs
+plots_st <- st_transform(plots_sf, crs = st_crs(wm))
+mapview(plots_st)
+
+# Extract the microclimate values.
+plots_st <- vect(plots_st)
+plotsmicro <- extract(wm, plots_st, method = "simple", bind = T)
+plotsmicro <- as_tibble(plotsmicro)
+head(plotsmicro)
+colnames(plotsmicro)[2] <- "MI_wm"
+hist(plotsmicro$MI_wm)
+
+# Add a new column of wm
+macro$MI_wm <- plotsmicro$MI_wm[match(macro$plotID, plotsmicro$plotID)]
+head(macro)
+macro$MI_wm <- round(macro$MI_wm, digits = 1)
+hist(macro$MI_wm)
+
+lm_wm <- lm(deltaCIT ~ macro_diff * MI_wm, data = macro)
+summary(lm_wm)
+p_wm <- ggpredict(lm_wm, c("macro_diff", "MI_wm [0.3, 0.6, 0.9 ]"))
+plot(p_wm)
+
+lm_all <- lm(deltaCIT ~ macro_diff * MI_BV * MI_wm, data = macro)
+summary(lm_all)
+saveRDS(macro, file = "I:/DATA/output/MinTmicroMI_macro_diff.RDS")
+
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+tab_model(lm_bv, lm_fv, lm_wm,
+  title = "Table 1.  ",
+  file = "I:/DATA/output/tmp/lm_macro.html"
+)
