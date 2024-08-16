@@ -175,11 +175,11 @@ str(plot_tc02)
 plot_tc02 <- plot_tc02 %>%
   mutate(
     ResuveyYr = case_when(
-      Resurvey_cit == R1 ~ year_resurvey_R1,
-      Resurvey_cit == R2 ~ year_resurvey_R2,
-      Resurvey_cit == R3 ~ year_resurvey_R3,
+      Resurvey_cit == R5 ~ year_resurvey_R5,
       Resurvey_cit == R4 ~ year_resurvey_R4,
-      TRUE ~ year_resurvey_R5
+      Resurvey_cit == R3 ~ year_resurvey_R3,
+      Resurvey_cit == R2 ~ year_resurvey_R2,
+      TRUE ~ year_resurvey_R1
     )
   )
 
@@ -357,8 +357,8 @@ plot(micro_cit02$Backward_velocity, micro_cit02$CITperYr)
 macro <- readRDS("I:/DATA/output/macro_diff.RDS")
 
 # Add the MI of velocity to the data.
-macro$MI_BV <- micro_cit02$Backward_velocity[
-  match(macro$plotID, micro_cit02$plotID)
+macro$MI_BV <- plotsmicro$Backward_velocity[
+  match(macro$plotID, plotsmicro$plotID)
 ]
 head(macro)
 macro$MI_BV <- round(macro$MI_BV, digits = 1)
@@ -374,7 +374,7 @@ lm_bv <- lm(deltaCIT ~ macro_diff * MI_BV, data = macro)
 lm_fv <- lm(deltaCIT ~ macro_diff * MI_FV, data = macro)
 summary(lm_bv)
 hist(macro$MI_BV)
-p_vel <- ggpredict(lm_vel, c("macro_diff", "MI_BV [0.1, 0.5, 0.9]"))
+p_vel <- ggpredict(lm_bv, c("macro_diff", "MI_BV [0.1, 0.5, 0.9]"))
 plot(p_vel)
 
 #### Add the MI of warming magnitude.####

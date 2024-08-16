@@ -28,6 +28,7 @@ cit_mint_winspr <- species_winspr |>
     cit_mint_winspr = weighted.mean(Mean_minTDec2May, abundance)
   )
 head(cit_mint_winspr)
+
 ##### Convert CIT data into one plot per row.####
 # Seperate baseline survey and resurvey into different columns.
 # (baseline survey B vs resurvey R1 to R5)

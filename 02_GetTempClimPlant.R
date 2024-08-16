@@ -5,11 +5,13 @@ library(dplyr)
 # Maximum temperature during growing season (April-September)
 # at 1000 random locations for all 1168 species
 maxTempGS <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempGrowingSeason.csv")
+
 # Monthly minimum temperatures during spring (March to May)
 # at 1000 random locations for all 1168 species
 minTempMarch <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempMar.csv")
 minTempApril <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempApr.csv")
 minTempMay <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempMay.csv")
+
 # Monthly minimum temperatures during winter (December to February)
 # at 1000 random locations for all 1168 species
 minTempDecember <- read.csv("I:/DATA/input/ClimPlant/12199628/MinTempDec.csv")
