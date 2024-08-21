@@ -99,6 +99,12 @@ plotinfo$CITperYr <- plotinfo$deltaCIT / plotinfo$deltaYr
 # Test the relationship between delta cit and macroclimate change.
 lm_macro <- lm(deltaCIT ~ macro_diff, data = plotinfo)
 summary(lm_macro) # Not significant
+save(lm_macro, file = "I:/DATA/output/lm_rdata/lm_macro_diff_cit.RData")
+pred_macro <- predict_response(
+    lm_macro, "macro_diff",
+    margin = "mean_mode"
+)
+pred_macro
 
 # Forward velocity versus CIT change per year.
 lm_fv <- lm(CITperYr ~ MI_FV, data = plotinfo)
@@ -117,6 +123,12 @@ lm_wm <- lm(deltaCIT ~ MI_wm, data = plotinfo)
 summary(lm_wm) # Weak significant.
 gpred_wm <- ggpredict(lm_wm)
 plot(gpred_wm)
+
+#### fit model with 4-way-interaction ####
+fit4 <- lm(deltaCIT ~ macro_diff * MI_wm * MI_FV * MI_BV, data = plotinfo)
+
+# adjusted predictions for all 4 interaction terms
+pr <- predict_response(fit4, c("MI_wm", "macro_diff [0.4, 1.0, 1.6]"))
 
 # Try with interaction between macro_diff and other variables.
 # Macro diff with forward velocity MI.
@@ -150,29 +162,43 @@ gpred_macro_bv <- ggpredict(
 )
 plot(gpred_macro_bv)
 
-# Add all.
-lm_all <- lm(deltaCIT ~ macro_diff:(7:9), data = plotinfo)
-summary(lm_all)
-
 # load package
 library(sjPlot)
 library(sjmisc)
 library(sjlabelled)
-tab_model(lm_macro, lm_fv, lm_bv, lm_wm,
-    title = "Table 1. Regression between CIT and microrefugia indices ",
+
+tab_model(lm_macro, lm_macro_fv, lm_macro_bv, lm_macro_wm,
+    title = "Table 1. Regression between CIT, macroclimate and microrefugia indices ",
     transform = NULL,
     file = "I:/DATA/output/tmp/lm_MEB.html"
 )
 
-# Try generalized least square regression..
-library(nlme)
-summary(plotinfo)
+# Generate spatial point vector to add in the map.
+library(sf)
+library(mapview)
+library(terra)
+
+offset <- rast("E:/Output/ForestOffset/mean/mean_ForestTempMaxTOffset_V3.tif")
+
 colSums(is.na(plotinfo))
-plotinfo_gls <- na.omit(plotinfo)
-gls_exp <- gls(
-    deltaCIT ~ MI_wm + MI_FV +
-        MI_BV + macro_diff + CanopyChange,
-    correlation = corExp(form = ~ latitude + longitude, nugget = T),
-    data = plotinfo_gls
+plotinfo_nona <- na.omit(plotinfo)
+
+plots_xy <- plotinfo_nona[, c(1:3)]
+
+# Convert data frame to sf object
+eu_plots_sf <- st_as_sf(
+    x = plots_xy,
+    coords = c("longitude", "latitude"),
+    crs = "+proj=longlat +datum=WGS84"
 )
-summary(gls_exp)
+
+mapview(eu_plots_sf)
+
+eu_plots_st <- st_transform(eu_plots_sf, crs = st_crs(offset))
+mapview(eu_plots_st)
+
+# Extract the microclimate values.
+eu_plots_st <- vect(eu_plots_st)
+writeVector(
+    eu_plots_st, filename = "I:/DATA/output/resurvey_plots.shp", overwrite = TRUE
+    )

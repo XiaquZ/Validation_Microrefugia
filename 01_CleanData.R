@@ -1,27 +1,20 @@
-## ForestREplot
+#### ForestREplot ####
+library(dplyr)
 
 # Plot data of all plots in ForestREplot database
-load("I:/DATA/input/forestREplot/version3/plot_data.RData")
+load("I:/DATA/input/forestREplot/version3.1/plot.data_forestREplot_V3.1.RData")
 # Vegetation data of all plots
-load("I:/DATA/input/forestREplot/version3/veg_data.RData")
+load("I:/DATA/input/forestREplot/version3.1/veg.data_forestREplot_V3.1.RData")
 
 # Insepect forestREplot data.
 head(plot_data)
 head(veg_data)
 
-## MI data
-
-# MIs based on three climate offsets (mean annual temperature,
-# minimmum temperature during spring and winter and maximum temperature during summer)
-# and synthesis MIs (mean of the three MIs)
-load("ClimateOffset_MIs_XiquZ_V3.RData")
-MI_Offset_magnitude <- coordinates_plots
-
 # ---- 3. FILTER AND CLEAN DATA ----
 
 # Select plots and vegetation data from Europe (and excluding that of North America)
-veg_EU <- veg_data[grep("EU", veg_data$sample), ]
-plot_EU <- plot_data[grep("EU", plot_data$plotID), ]
+veg_EU <- veg_data[grep("EU_", veg_data$sample), ]
+plot_EU <- plot_data[grep("EU_", plot_data$plotID), ]
 head(veg_EU)
 head(plot_EU)
 inspNA <- plot_EU[!is.na(plot_EU$n_quadrat_B), ] #all the columns are NA.
@@ -35,57 +28,38 @@ inspNA <- plot_EU[!is.na(plot_EU$year_resurvey_R4), ] #629 obs
 inspNA <- plot_EU[!is.na(plot_EU$year_resurvey_R5), ] #86 obs
 inspNA <- plot_EU[!is.na(plot_EU$year_afforestation), ] #282 obs
 
+# Check the data
 unique(plot_EU$former_landuse)
-#  [1] "ancient"
-#  [2] "not known"
-#  [3] NA
-#  [4] "recent"
-#  [5] "common grazing, poss wood pasture"
-#  [6] "yes"
-#  [7] "grassland"
-#  [8] "border grassland / ancient"
-#  [9] "water (?) (1786), grassland (1900)"
-# [10] "water (?)"
-# [11] "water (1786), water/reed (1900)"
-# [12] "grassland / bog"
-# [13] "grassland (1786), water/reed (1900)"
-# [14] "grassland (1786), open bog (1900)"
-# [15] "wet grassland / open bog"
-# [16] "forest until >1900"
-# [17] "grassland / open bog"
-# [18] "heathland"
-# [19] "meadow"
-# [20] "not known, probably ancient"
-# [21] "Wood pasture"
-# [22] "arable"
-# [23] "other (fallow land)"
-# [24] "other (pond)"
-# [25] "successional forest on wet grassland"
-# [26] "post-agricultural forest, single tree selection"
-# [27] "other: open sand dune"
-# [28] "ancient forest"
-# [29] "Ancient"
-# [30] "Grassland"
 unique(veg_EU$layer)
-# [1] "T"   "S"   "H"   "B"   "L"   "SH"  "TL2" "TL1" "SL"  "ML"  "HL"  "FL"
-# [13] "s"   "k"   "b"   "m"   "b2"  "b1"
+# "T"  "S"  "H"  "B"  "L"  "SH"
+## Remove the "B" "L" and "SH".
 class(veg_EU$layer)
+
 # Slect the layers that are not sure about. create a vector.
-list_values <- c("L", "ML", "HL", "FL", "s", "k", "b", "m", "b2", "b1")
+list_values <- c("L", "SH")
 
-veg_lyr <- subset(veg_EU,grepl(paste0(list_values, collapse = "|"), layer))
+veg_lyr <- subset(veg_EU, grepl(paste0(list_values, collapse = "|"), layer))
 
-# Select the herb layer (for the further analysis) and tree layer (for the calculation of forest canopy changes later on) of the plots
+# Select the herb layer (for CIT), shrub layer
+# and tree layer (for the calculation of forest canopy changes later on).
 vegherb <- veg_EU[grep("H", veg_EU$layer), ] # herb layer (H)
-vegtree <- veg_EU[grep("T", veg_EU$layer), ] # tree layer (T)
+
+# Tree and shrub layer.
+list_values <- c("T", "S")
+veg_treeshrub <- subset(
+  veg_EU, grepl(paste0(list_values, collapse = "|"), layer)
+  )
+
 hist(vegherb$abundance)
-hist(vegtree$abundance)
+hist(veg_treeshrub$abundance)
+
 # Select the sites with abnormal abundance values.
 herb_abun <- subset(vegherb, vegherb$abundance > 5000)
 unique(herb_abun$abundance) #9999
 
-tree_abun <- subset(vegtree, vegtree$abundance > 5000)
-unique(tree_abun$abundance) #9999 42737
+treeshrub_abun <- subset(veg_treeshrub, veg_treeshrub$abundance > 5000)
+unique(treeshrub_abun$abundance) #9999 42737
+plotinfo <- treeshrub_abun[grep("42737", treeshrub_abun$abundance), ]
 
 # Exclude abnormal abundance values (values of 9999)
 vegherb <- subset(vegherb,vegherb$abundance < 5000)
