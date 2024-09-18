@@ -23,6 +23,12 @@ maxT_Jun <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempJun.csv")
 maxT_Jul <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempJul.csv")
 maxT_Aug <- read.csv("I:/DATA/input/ClimPlant/12199628/MaxTempAug.csv")
 
+# Microclimate data from ClimPlant.
+micro <- read.csv("I:/DATA/input/ClimPlant/12199628/Summaryfile_V2.0.csv")
+head(micro)
+# Extract Microclimate_YearMeanMean
+micro_mean <- select(micro, X, Microclimate_YearMeanMean)
+
 # plotting the density of the temperature distribution of a species.
 class(minTempApril)
 AbAl <- minTempApril[1, ]
@@ -120,63 +126,75 @@ load("I:/DATA/output/MeanMinT_MAR2MAY.RData")
 load("I:/DATA/output/minT_Dec2Feb.RData")
 load("I:/DATA/output/MeanMinT_Dec2Feb.RData")
 load("I:/DATA/input/forestREplot/version3/EU_herbL.RData")
+# forestREplot Version 3.1
+load("I:/DATA/output/forestREplot/EU_herbL.RData")
 
-
-# split the name of vegherb species with space and fix the 'x' in the species name.
-spe_herb <- vegherb |>
+head(vegherb)
+sp.lst <- unique(vegherb$species_name)
+# split the name of vegherb species with space
+# fix the 'x' in the hybrid species name.
+sp_herb <- vegherb |>
     separate(species_name,
         c("genus", "species"),
         extra = "merge",
         fill = "right"
     )
 ## use 'extra=merge' to keep the extra elements in the second name.
+head(sp_herb)
+# Check species name
+salix <- vegherb[grep("Salix", vegherb$species_name),]
 
 # Replace NA with a specific string
-spe_herb <- spe_herb |>
+sp_herb <- sp_herb |>
     mutate(species = ifelse(is.na(species), "UnknownSp", species))
-spe_herb <- spe_herb[complete.cases(spe_herb[]), ]
-spe_herb$species_name <- paste(spe_herb$genus, spe_herb$species)
-spe_herb <- spe_herb[-c(2:3)]
-spe_herb <- spe_herb[, c(1, 5, 2, 3, 4)]
-head(spe_herb)
-tail(spe_herb)
+sp_herb <- sp_herb[complete.cases(sp_herb[]), ]
+sp_herb$species_name <- paste(sp_herb$genus, sp_herb$species)
+head(sp_herb)
+sp_herb <- sp_herb[-c(2:3)]
+sp_herb <- sp_herb[, c(1, 5, 2, 3, 4)]
+head(sp_herb)
+tail(sp_herb)
 
-## Circaea intermedia  Prunus fruticans: hybride, add 'x' in the name.
-# For Circaea intermedia
-dup_sp <- grep("Circaea intermedia", spe_herb$species_name)
-tadf <- spe_herb[dup_sp, ]
+## Check the hybrid species names.
+# For Salix fraglis
+dup_sp <- grep("Salix", sp_herb$species_name)
+tadf <- sp_herb[dup_sp, ]
 # spe_herb$species_name <- gsub(
 #     "Circaea intermedia", "Circaea x intermedia",
 #     spe_herb$species_name
 # )
 # dup_sp <- grep("Circaea x intermedia", spe_herb$species_name)
 # tadf <- spe_herb[dup_sp, ]
-# For Prunus fruticans
-dup_sp <- grep("Prunus fruticans", spe_herb$species_name)
-tadf <- spe_herb[dup_sp, ]
+
+# For Dryopteris tavelii.
+dup_sp <- grep("Dryopteris tavelii", sp_herb$species_name)
+tadf <- sp_herb[dup_sp, ]
 # spe_herb$species_name <- gsub(
 #     "Prunus fruticans", "Prunus x fruticans",
 #     spe_herb$species_name
 # )
 # dup_sp <- grep("Prunus x fruticans", spe_herb$species_name)
 # tadf <- spe_herb[dup_sp, ]
-save(spe_herb, file = "I:/DATA/input/forestREplot/version3/CleanHerbL.RData")
+
+# For species with multiple names: Dryopteris dilatata/expansa
+dup_sp <- grep("Dryopteris", sp_herb$species_name)
+tadf <- sp_herb[dup_sp, ]
+unique(tadf$species_name)
+
+# Save final data
+save(sp_herb, file = "I:/DATA/output/forestREplot/Cleaned_EU_HerbL.RData")
 
 #### Match with ClimPlant ####
-load("I:/DATA/output/preparation/CleanHerbL.RData")
-sp_list <- data.frame(unique(spe_herb$species_name)) # 1441 obs
+load("I:/DATA/output/forestREplot/Cleaned_EU_HerbL.RData")
+load("I:/DATA/output/ClimPlants_micro_mean.RDS")
+sp_list <- data.frame(unique(sp_herb$species_name)) # 1441 obs
 colnames(sp_list)[1] <- "species_name"
 head(sp_list)
 
 # there are 1441 species from forestREplot H. 1168 in ClimPlants.
-Re.climP <- right_join(sp_list, mean_minTSpr, by = "species_name")
-# check hybrid species
-pf <- grep("Prunus", mean_minTWin$species_name)
-pfdf <- mean_minTWin[pf, ] # No ClimPlant data for Prunus x fruticans.
-ci <- grep("Circaea intermedia", mean_minTWin$species_name)
-cidf <- mean_minTWin[ci, ] # ClimPlant includes Circaea intermedia.
+Re.climP <- right_join(sp_list, micro_mean, by = "species_name")
 
-## 1168 obs in merge data, there are some species not in ClimPlants.
+## 1168 obs in merge data, there are around 19% species not in ClimPlants.
 clim_ugent <- (1441 - 1168) / 1441
 ## There are 0.189 species in foresREplot not in the ClimPlants.
 # ClimPlant covers 81.1% forestREplot species.
@@ -185,13 +203,20 @@ clim_ugent <- (1441 - 1168) / 1441
 # For the minimum temperature during spring
 herb_spr <- right_join(spe_herb, mean_minTSpr, by = "species_name")
 head(herb_spr)
+
 # For the minimum temperature during winter
 herb_win <- right_join(spe_herb, mean_minTWin, by = "species_name")
 head(herb_win)
+
 # For the maximum temperature during growing season
 herb_maxTGs <- right_join(spe_herb, mean_maxT_Gs, by = "species_name")
+
 # For the maximum temperature during summer
 herb_maxTSum <- right_join(spe_herb, mean_maxT_summer, by = "species_name")
+
+# For the microclimate mean annual temperature
+herb_micro <- right_join(sp_herb, micro_mean, by = "species_name")
+head(herb_micro)
 
 # Save data
 save(herb_spr,
@@ -203,10 +228,17 @@ save(herb_win,
 save(herb_maxTGs,
     file = "I:/DATA/input/forestREplot/version3/HerbL_MmaxT_GS.RData"
 )
+
 save(herb_maxTSum,
     file = "I:/DATA/output/preparation/HerbL_MmaxT_Summer.RData"
 )
-# Displaying species response curves for illustration (one example here for minimum temperature during spring)
+
+save(herb_micro,
+    file = "I:/DATA/output/forestREplot/EU_HerbL_micro_mean.RData"
+)
+
+# Displaying species response curves for illustration
+# (one example here for minimum temperature during spring)
 plot_min_spr <- data.frame(t(minT_Spr[, 2:1001]))
 # ggplot takes columns so invert dataframe first
 plot_min_spr
@@ -219,4 +251,6 @@ ggplot(plot_min_spr, aes(plot_min_spr[, 1])) +
     xlab("Minimum temperature during spring (°C)") +
     ggtitle("Abies alba") +
     theme(plot.title = element_text(hjust = 0, size = 20)) +
-    geom_vline(aes(xintercept = mean(plot_min_spr[, 1])), linetype = "dashed", linewidth = 0.75) # adding mean as vertical dashed line
+    geom_vline(aes(xintercept = mean(plot_min_spr[, 1])),
+     linetype = "dashed", linewidth = 0.75) 
+     # adding mean as vertical dashed line
