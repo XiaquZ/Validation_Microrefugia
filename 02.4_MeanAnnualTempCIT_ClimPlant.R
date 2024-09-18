@@ -35,40 +35,40 @@ min(!is.na(sp_herb$abundance)) # 1
 # And also remove the plots that contain these species, as it will
 # have wrong conclusions on CIT.
 anyNA(micro_mean$Microclimate_YearMeanMean) # False
-anyNA(sp_herb$sample) #F
-x <- merge(micro_mean,sp_herb, all = T)
-anyNA(x$sample) #T
+anyNA(sp_herb$sample) # F
+x <- merge(micro_mean, sp_herb, all = T)
+anyNA(x$sample) # T
 
 # Check which species in ClimPlant that are not in replot.
 # remove these species that did not appear in replot.
 s <- x[is.na(x$sample), ]
 x <- x |> drop_na(sample)
-anyNA(x$sample) #False
+anyNA(x$sample) # False
 
-# Check species/plots that do not have microclimate data.
-y <- x[is.na(x$Microclimate_YearMeanMean),]
-anyNA(y$sample) #F
+# Check species that do not have microclimate data.
+y <- x[is.na(x$Microclimate_YearMeanMean), ]
+anyNA(y$sample) # F
 
-# Remove these plots from data
-plot_ls <- unique(y$sample)
-species_micro <- x[!x$sample %in% plot_ls, ] #14177
+# Remove these species from data
+species_micro <- x |> drop_na(Microclimate_YearMeanMean)
 min(species_micro$Microclimate_YearMeanMean)
+max(species_micro$Microclimate_YearMeanMean)
 
 # Check the data
-y <- species_micro[is.na(species_micro$Microclimate_YearMeanMean),] #0
+j <- species_micro[species_micro$Microclimate_YearMeanMean == '#N/A', ] # 7
 species_micro <- as_tibble(species_micro)
 head(species_micro)
 
-# Check the row with non-numeric in the microclimate column.
-dup_sp <- species_micro[grep("Erica tetralix", species_micro$species_name),]
+# Remove these row.
+species_micro <- species_micro[
+    !grepl("#N/A", species_micro$Microclimate_YearMeanMean),
+]
+min(species_micro$Microclimate_YearMeanMean) # Not N/A anymore
 
-# Remove this plot.
-species_micro <- species_micro[!grepl('EU_078_43_R1', species_micro$sample), ]
-
-# Rearrange data
+# Re-arrange data
 species_micro$Microclimate_YearMeanMean <- as.numeric(
     species_micro$Microclimate_YearMeanMean
-) 
+)
 head(species_micro)
 species_micro <- species_micro[, c(3, 1, 2, 4, 5, 6)]
 
@@ -96,16 +96,15 @@ colnames(r1)[2] <- "R1"
 r1$sample <- str_replace(r1$sample, "_R1", "") # get plotid.
 head(r1)
 
-# merge r1 data to the plot data.
+# Merge r1 data to the plot data.
 plot_micro <- merge(plot_micro, r1, by = "sample", all = TRUE)
-## 969 obs
 
-sum(is.na(plot_micro$baseline)) # 344 plots without baseline but have R1.
-sum(is.na(plot_micro$R1)) # 385 plots without R1 but have bseline.
-nobaseline <- plot_mat[is.na(plot_mat$baseline), ]
+# Check data
+sum(is.na(plot_micro$baseline)) # 13 plots without baseline but have R1.
+sum(is.na(plot_micro$R1)) # 31 plots without R1 but have bseline.
 
 # Check which plots have a second resurvey R2.
-r2 <- cit_micro[grep("_R2", cit_micro$sample), ] # 250 obs
+r2 <- cit_micro[grep("_R2", cit_micro$sample), ] # 1431 obs
 colnames(r2)[2] <- "R2"
 r2$sample <- str_replace(r2$sample, "_R2", "") # get plotid.
 head(r2)
@@ -117,7 +116,6 @@ head(plot_micro)
 # Check which plots have a resurvey R3.
 r3 <- cit_micro[grep("_R3", cit_micro$sample), ] # 18 obs
 colnames(r3)[2] <- "R3"
-
 r3$sample <- str_replace(r3$sample, "_R3", "") # get plotid.
 
 # merge r3 data to the plot data.
@@ -140,8 +138,8 @@ r5$sample <- str_replace(r5$sample, "_R5", "") # get plotid.
 plot_micro <- merge(plot_micro, r5, by = "sample", all = TRUE)
 head(plot_micro)
 
-x <- plot_micro[rowSums(!is.na(plot_micro))>2, ]
+plot_micro <- plot_micro[rowSums(is.na(plot_micro[, 2:7])) >= 2, ]
 
-save(plot_mat,
-    file = "I:/DATA/output/CommunityInferredTemp/CIT_Allsurveys_MAT.RData"
+save(plot_micro,
+    file = "I:/DATA/output/CommunityInferredTemp/CIT_microTemp_AllSurvey.RData"
 )
