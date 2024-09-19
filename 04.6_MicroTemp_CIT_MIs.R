@@ -229,59 +229,102 @@ temp <- y[y$resurvey_time == "R3", ]
 subinfo <- plotinfo[grep("EU_009b_1", plotinfo$plotID), ] # correct
 micro_cit <- y
 save(micro_cit, file = "I:/DATA/output/tmp/micro_cit.RData")
+load("I:/DATA/output/tmp/micro_cit.RData")
 
 # Clean the year data in Sup_CleanReplotYearData.R.
+unique(micro_cit$first_year)
+head(micro_cit)
 
+# Define the list of values to search for
+list_values <- c(
+    "1976 \\(T, S 1975\\)", "1956-57",
+    "1955 and 57", "1963\\?",
+    "1998/99"
+)
 
+# Note that Some characters such as (, ), ?, and - have special meanings
+# in regular expressions.
+# To match them literally, you need to escape them with a double backslash \\.
+micro_cit02 <- micro_cit %>%
+    filter(grepl(paste(list_values, collapse = "|"), first_year))
 
+# Replace the "1976 \\(T, S 1975\\)" with "1976".
+micro_cit$first_year <- gsub(
+    "1976 \\(T, S 1975\\)", "1976",
+    micro_cit$first_year
+)
+
+# Replace the "1956-57" with "1957".
+micro_cit$first_year <- gsub(
+    "1956-57", "1957",
+    micro_cit$first_year
+)
+
+# Replace the "1955 and 57" with "1956".
+micro_cit$first_year <- gsub(
+    "1955 and 57", "1956",
+    micro_cit$first_year
+)
+
+# Replace the "1963\\?" with "1963".
+micro_cit$first_year <- gsub(
+    "1963\\?", "1963",
+    micro_cit$first_year
+)
+
+# Replace the "1998/99" with "1999".
+micro_cit$first_year <- gsub(
+    "1998/99", "1999",
+    micro_cit$first_year
+)
+
+# Check the baseline year again.
+baseline <- unique(micro_cit$first_year)
+baseline ##Nomal
 
 # Check if the resurvey year is correct in the plot info.
-load("I:/DATA/input/forestREplot/version3/plot_data.RData")
-# Load the plot_data to get the survey year.
-head(plot_data)
-plot_data <- plot_data[, c(1, 9:14)]
-plot_data <- as_tibble(plot_data)
-head(plot_data)
-
-plot_mat <- merge(plot_mat, plot_data, by = "plotID")
-head(plot_mat)
-
-# Add the year of recent survey to a new column.
-plot_mat <- plot_mat |>
-    mutate(
-        Resuvey_year = case_when(
-            Resurvey_cit == R5 ~ year_resurvey_R5,
-            Resurvey_cit == R4 ~ year_resurvey_R4,
-            Resurvey_cit == R3 ~ year_resurvey_R3,
-            Resurvey_cit == R2 ~ year_resurvey_R2,
-            TRUE ~ year_resurvey_R1
-        )
-    ) |>
-    as_tibble()
-head(plot_mat)
+unique(micro_cit$resurvey_year)
+# Replace the "2019-2020" with "2020".
+micro_cit$resurvey_year <- gsub(
+    "2019-2020", "2020",
+    micro_cit$resurvey_year
+)
+unique(micro_cit$resurvey_year)
 
 # Remove columns that won't be used.
-match("year_resurvey_R1", names(plot_mat))
-plot_mat <- plot_mat[, -c(3:7, 10:14)]
-head(plot_mat)
-plot_mat <- subset(plot_mat, plotID %in% plotinfo$plotID)
-head(plot_mat)
-## Identical to the plot info.
+head(micro_cit)
+micro_cit <- micro_cit[, -c(2:7)]
+head(micro_cit)
 
 # Calculate delta CIT and delta year between baseline and recent survey.
-plotinfo <- plotinfo |>
+str(micro_cit)
+micro_cit <- as_tibble(micro_cit)
+micro_cit$resurvey_year <- as.numeric(micro_cit$resurvey_year)
+micro_cit$first_year <- as.numeric(micro_cit$first_year)
+
+micro_cit <- micro_cit |>
     mutate(
-        deltaCIT = plotinfo$ResurveyCIT - plotinfo$baselineCIT,
-        deltaYr = plotinfo$ResuveyYr - plotinfo$year_baseline_survey
+        deltaCIT = micro_cit$Resurvey_cit - micro_cit$first_cit,
+        deltaYr = micro_cit$resurvey_year - micro_cit$first_year
     )
 
 # Check for na values in delta cit.
-sum(is.na(plotinfo$deltaCIT)) # 0
-sum(is.na(plotinfo$deltaYr)) # 0
-head(plotinfo)
-hist(plotinfo$deltaCIT)
+anyNA(micro_cit$deltaYr)
+anyNA(micro_cit$deltaCIT)
+head(micro_cit)
+hist(micro_cit$deltaCIT)
+hist(micro_cit$deltaYr)
+
 # Calculate CIT change per year.
-plotinfo$CITperYr <- plotinfo$deltaCIT / plotinfo$deltaYr
+micro_cit$CITperYr <- micro_cit$deltaCIT / micro_cit$deltaYr
+
+# Add the xy information.
+head(plot_data)
+micro_cit$x <- plot_data$longitude[match(micro_cit$plotID, plot_data$plotID)]
+micro_cit$y <- plot_data$latitude[match(micro_cit$plotID, plot_data$plotID)]
+head(micro_cit)
+save(micro_cit, file = "I:/DATA/output/tmp/micro_cit.RData")
+## Go to the 05_extracMicro.R
 
 # Test the relationship between delta cit and macroclimate change.
 lm_macro <- lm(deltaCIT ~ macro_diff, data = plotinfo)
