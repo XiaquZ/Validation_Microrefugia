@@ -77,11 +77,6 @@ head(micro_cit)
 cor.test(micro_cit$WarmingPerYr, micro_cit$CITperYr)
 hist(micro_cit$WarmingPerYr)
 
-# save data
-save(micro_cit,
-    file = "I:/DATA/output/ExtractMicroIndex/MicroClimPlantCIT_MIs.RData"
-)
-
 # Check if there any duplicate coordinations.
  load("I:/DATA/output/ExtractMicroIndex/MicroClimPlantCIT_MIs.RData")
 n_occur <- unique(micro_cit$x)
@@ -96,3 +91,6 @@ micro_cit <- micro_cit[!(micro_cit$plotID %in% plotls), ]
 save(micro_cit,
     file = "I:/DATA/output/ExtractMicroIndex/MicroClimPlantCIT_MIs.RData"
 )
+hist(micro_cit$first_year)
+hist(micro_cit$deltaYr)
+

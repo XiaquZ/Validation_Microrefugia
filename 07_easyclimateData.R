@@ -6,7 +6,7 @@ library(easyclimate)
 
 # Load data
 load("I:/DATA/output/ExtractMicroIndex/MicroClimPlantCIT_MIs.RData")
-temp_crs <- rast("D:/PhD/Data/Output/WarmingMagnitude_SSP370_v3.tif")
+temp_crs <- rast("H:/Output/forestBIO1_convertedTO0_25m.tif")
 
 # 'easyclimate' only has climate data available after 1950-
 hist(micro_cit$first_year)
@@ -28,7 +28,7 @@ head(plots_xy)
 # Convert data frame to sf object
 plots_sf <- st_as_sf(
     x = plots_xy,
-    coords = c("x", "y"),
+    coords = c("lon", "lat"),
     crs = "+proj=longlat +datum=WGS84"
 )
 # View in the map
@@ -63,9 +63,47 @@ writeVector(single_buf,
 lambert_xy <- st_coordinates(eu_plots_st)
 wgs_xy <- st_coordinates(plots_sf)
 
-# Get daily minimum temperature January.
+# Get daily minimum temperature 1950.
 ?get_daily_climate
-tas_min <- get_daily_climate(wgs_xy, 
-period = "1950-01-01:1950-01-01",
-climatic_var = "Tmin",
-version = 4)
+tas_min <- get_daily_climate(
+    wgs_xy,
+    period = 1950,
+    climatic_var = "Tmin",
+    version = 4,
+    check_connection = TRUE
+)
+
+tail(tas_min)
+# Save data
+save(tas_min, file = 'I:/DATA/easyclimate/dailyTmin_1950.RData')
+
+# Get daily maximum temperature data of 1950.
+tas_max <- get_daily_climate(
+    wgs_xy,
+    period = 1950,
+    climatic_var = "Tmax",
+    version = 4,
+    check_connection = TRUE
+)
+head(tas_max)
+tail(tas_max)
+save(tas_max, file = 'I:/DATA/easyclimate/dailyTmax_1950.RData')
+
+# Get daily minimum data for the whole period.
+tasmin_yrs <- get_daily_climate(
+  wgs_xy,
+  period = 1951:2020,
+  climatic_var = "Tmin",
+  version = 4,
+  check_connection = TRUE
+)
+
+# Get daily maximum data for the whole period.
+tasmax_yrs <- get_daily_climate(
+  wgs_xy,
+  period = 1951:2020,
+  climatic_var = "Tmax",
+  version = 4,
+  check_connection = TRUE
+)
+
