@@ -63,14 +63,17 @@ writeVector(single_buf,
 lambert_xy <- st_coordinates(eu_plots_st)
 wgs_xy <- st_coordinates(plots_sf)
 
+save(wgs_xy, file = 'I:/DATA/output/wgs_xy_REplot3.1.RData')
+
+load("I:/DATA/output/wgs_xy_REplot3.1.RData")
 # Get daily minimum temperature 1950.
 ?get_daily_climate
 tas_min <- get_daily_climate(
-    wgs_xy,
-    period = 1950,
-    climatic_var = "Tmin",
-    version = 4,
-    check_connection = TRUE
+  wgs_xy,
+  period = 1950,
+  climatic_var = "Tmin",
+  version = 4,
+  check_connection = TRUE
 )
 
 tail(tas_min)
@@ -79,11 +82,11 @@ save(tas_min, file = 'I:/DATA/easyclimate/dailyTmin_1950.RData')
 
 # Get daily maximum temperature data of 1950.
 tas_max <- get_daily_climate(
-    wgs_xy,
-    period = 1950,
-    climatic_var = "Tmax",
-    version = 4,
-    check_connection = TRUE
+  wgs_xy,
+  period = 1950,
+  climatic_var = "Tmax",
+  version = 4,
+  check_connection = TRUE
 )
 head(tas_max)
 tail(tas_max)
@@ -92,18 +95,22 @@ save(tas_max, file = 'I:/DATA/easyclimate/dailyTmax_1950.RData')
 # Get daily minimum data for the whole period.
 tasmin_yrs <- get_daily_climate(
   wgs_xy,
-  period = 1951:2020,
+  period = 1951:1970,
   climatic_var = "Tmin",
   version = 4,
   check_connection = TRUE
 )
+head(tasmin_yrs)
+tail(tasmin_yrs)
+save(tasmin_yrs, file = 'I:/DATA/easyclimate/dailyTmin_1951-1970.RData')
 
 # Get daily maximum data for the whole period.
 tasmax_yrs <- get_daily_climate(
   wgs_xy,
-  period = 1951:2020,
+  period = 1951:1970,
   climatic_var = "Tmax",
   version = 4,
   check_connection = TRUE
 )
+save(tasmax_yrs, file = 'I:/DATA/easyclimate/dailyTmax_1951-1970.RData')
 
