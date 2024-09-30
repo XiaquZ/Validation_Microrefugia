@@ -114,3 +114,29 @@ tasmax_yrs <- get_daily_climate(
 )
 save(tasmax_yrs, file = 'I:/DATA/easyclimate/dailyTmax_1951-1970.RData')
 
+#### Get easyclimate of the buffer areas polygons. ####
+buffer <-vect('I:/DATA/output/Plot_shp/70kmBuffer_REplotAfter1950.shp')
+mapview(buffer)
+buffer_wgs <- project(buffer, "EPSG:4326")
+plot(buffer_wgs)
+# Save the buffer as .shp file.
+writeVector(buffer_wgs,
+            filename = "I:/DATA/output/Plot_shp/70kmBuffer_REplotAfter1950_wgs84.shp",
+            overwrite = TRUE
+)
+
+## Download Tmax values for buffer between 1950-1970
+buffertemp_max <- get_daily_climate(
+  coords = buffer_wgs,
+  climatic_var = "Tmax",
+  period = 1950:1970,
+  output = "raster"
+)
+
+## Download Tmin values for buffer between 1950-1970
+buffertemp <- get_daily_climate(
+  coords = buffer_wgs,
+  climatic_var = "Tmin",
+  period = 1950:1970,
+  output = "raster"
+)
