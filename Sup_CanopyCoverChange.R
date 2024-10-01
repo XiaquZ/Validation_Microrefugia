@@ -2,8 +2,8 @@ library(dplyr)
 library(tidyverse)
 
 # Load data
-load("I:/DATA/output/forestREplot/TreeShrubCanopyCover_v3.1.RData")
-load("I:/DATA/output/ExtractMicroIndex/MicroClimPlantCIT_MIs.RData")
+load("I:/DATA/output/forestREplot/EU_TreeShrubL.RData")
+load("I:/DATA/output/MicroClimPlant_CIT/MicroClimPlantCIT_MIs.RData")
 load("I:/DATA/input/forestREplot/version3.1/plot.data_forestREplot_V3.1.RData")
 
 # Data that only contain plots with first survey after 1950
