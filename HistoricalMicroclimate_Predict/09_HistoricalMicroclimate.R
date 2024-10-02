@@ -2,7 +2,6 @@ library(terra)
 library(sf)
 library(mapview)
 library(dplyr)
-library(ggeffects)
 
 # Load the data
 load("I:/DATA/easyclimate/output/Mean_annualTemp_REplot1950-1970.RData")
@@ -11,14 +10,17 @@ load("I:/DATA/easyclimate/output/Mean_annualTemp_REplot2000-2020.RData")
 pre <- mean_annual_tmean
 head(hist)
 head(pre)
+load("I:/DATA/easyclimate/input/dailyTmax_1951-1970.RData")
+head(tasmax_yrs)
 
-# Extract the offset of 2000-2020.
-offset_pre <- rast("I:/DATA/mean_annualOffset.tif")
-print(offset_pre)
+# # Extract the offset of 2000-2020.
+# offset_pre <- rast("I:/DATA/mean_annualOffset.tif")
+# print(offset_pre)
 
 # Load the microclimate CIT data
-load("I:/DATA/output/MicroClimPlant_CIT/MicroClimPlant_REplotV3.1_1950s.RData")
-head(plots_micro)
+load("I:/DATA/output/MicroClimPlant_CIT/MicroClimP_REp3.1_1950s.RData")
+plots_micro <- as_tibble(plots_micro)
+load("I:/DATA/output/hist_micro/historicalMicroOffset.RData")
 
 # Calculate the historical microclimate offset
 # Extract the current offset values.
@@ -34,6 +36,7 @@ xy_trans <- st_transform(xy, crs = st_crs(offset_pre))
 mapview(xy_trans)
 xy_trans <- vect(xy_trans)
 
+#### Predicting historical microclimate. ####
 # Extract offset.
 plot_offset <- extract(offset_pre, xy_trans, method = "simple", bind = T)
 plot_offset <- as.data.frame(plot_offset)
@@ -50,6 +53,7 @@ micro_current <- left_join(micro_hist, pre)
 colnames(micro_current)[2] <- "offset_current"
 colnames(micro_current)[5] <- "macroclimate_current"
 plot(micro_current$macroclimate_current, micro_current$offset_current)
+
 # Fit linear regression model between offset and macroclimate.
 reg1 <- lm(offset_current ~ macroclimate_current, data = micro_current)
 summary(reg1)
@@ -85,131 +89,9 @@ bio1_current <- as_tibble(bio1_current)
 warming <- lm_df[, c(1, 3:4, 9)]
 head(warming)
 
-# Calculate warming magnitude
-warming$micro_current <- bio1_current$ForestClim_01[match(
-    bio1_current$plotID, warming$plotID
-)]
-head(warming)
-
-warming$hist_warming <- warming$micro_current - warming$micro_hist
-hist(warming$hist_warming)
-warm_max <- max(warming$hist_warming)
-warm_min <- min(warming$hist_warming)
-
-# Rescale  warming magnitude
-quantile_ls <- quantile(warming$hist_warming, c(.05, .95), na.rm = T)
-hist(warming$hist_warming)
-warming <- warming |>
-    mutate(
-        MI_warming = ifelse(
-            warming$hist_warming < quantile_ls[[1]],
-            1,
-            ifelse(warming$hist_warming > quantile_ls[[2]],
-                0,
-                (warm_max - warming$hist_warming) / (warm_max - warm_min)
-            )
-        )
-    )
-plot(warming$hist_warming, warming$MI_warming)
-
-# Add warming MI to the plot CIT dataframe.
-plots_micro$MI_warming <- warming$MI_warming
-plots_micro$hist_warming <- warming$hist_warming
-plots_micro$warming_decade <- plots_micro$hist_warming / 5
-plots_micro$warmingPerYr <- plots_micro$hist_warming / 50
-
-# Check the data
-plot(plots_micro$warmingPerYr, plots_micro$CITperYr)
-lm_warm <- lm()
-hist(plots_micro$warmingPerYr)
-str(plots_micro)
-
-# Subset the MIs of warming based on the MI data distribution.
-sub_plot <- plots_micro[
-    plots_micro$MI_warming > 0.4 & plots_micro$MI_warming < 0.7,
-]
-
-# Subset canopy cover that were increased.
-sub_plot_cover <- plots_micro[
-    plots_micro$delta_cover > -20 & plots_micro$delta_cover < 20,
-]
-sub_plot_cover <- as_tibble(sub_plot_cover)
-head(sub_plot_cover)
-sub_plot_cover <- sub_plot_cover[rowSums(is.na(sub_plot_cover[,16:18]))!=3,]
-anyNA(sub_plot_cover$delta_cover)
-
-hist(sub_plot_cover$delta_cover)
-hist(plots_micro$delta_cover)
-# Inspect the subplot data.
-# Warming per year with delta canopy cover.
-plot(sub_plot$warmingPerYr, sub_plot$delta_cover)
-lm_warmPYr_deltaCover <- lm(
-    warmingPerYr ~ delta_cover,
-    data = sub_plot
-)
-summary(lm_warmPYr_deltaCover) # p-value sig.
-save(lm_warmPYr_deltaCover,
-    file = "I:/DATA/output/lm_histmicro/lm_WarmPYr_deltaCover.RData"
-)
-
-# Warming mag with delta canopy cover
-plot(sub_plot$hist_warming, sub_plot$delta_cover)
-lm_warmM_deltaCover <- lm(
-    hist_warming ~ delta_cover,
-    data = sub_plot
-)
-summary(lm_warmM_deltaCover) # p-value sig.
-save(lm_warmM_deltaCover,
-    file = "I:/DATA/output/lm_histmicro/lm_WarmM_deltaCover.RData"
-)
-
-# MI of warming magnitude with delta canopy vover.
-plot(sub_plot$MI_warming, sub_plot$delta_cover)
-lm_MIwarm_deltaCover <- lm(
-    MI_warming ~ delta_cover,
-    data = sub_plot
-)
-summary(lm_MIwarm_deltaCover) # p-value sig.
-
-# MI of Warming magnitude with delta cit.
-plot(sub_plot$MI_warming, sub_plot$deltaCIT)
-lm_MIwarm_deltacit <- lm(
-    deltaCIT ~ MI_warming,
-    data = sub_plot
-)
-summary(lm_MIwarm_deltacit) # p-value sig.
-save(lm_MIwarm_deltacit,
-    file = "I:/DATA/output/lm_histmicro/lm_MIwarm_deltaCIT.RData"
-)
-
-# MI of Warming magnitude with cit per year.
-plot(sub_plot$MI_warming, sub_plot$CITperYr)
-lm_MIwarm_citPerYr <- lm(
-    CITperYr ~ MI_warming,
-    data = sub_plot
-)
-summary(lm_MIwarm_citPerYr) # Not sig.
-
-# Warming per year with delta cit change per year.
-plot(sub_plot$warmingPerYr, sub_plot$CITperYr)
-lm_warmPerYr_citPerYr <- lm(
-    CITperYr ~ warmingPerYr,
-    data = sub_plot
-)
-summary(lm_warmPerYr_citPerYr) # Not sig.
-
-# Check the relationship between delta cit and cover.
-plot(sub_plot$delta_cover, sub_plot$deltaCIT)
-lm_cover_cit <- lm(
-    deltaCIT ~ delta_cover,
-    data = sub_plot
-)
-summary(lm_cover_cit)
-
-hist(sub_plot$CITperYr)
+# Save data
 save(lm_df, file = "I:/DATA/output/hist_micro/historicalMicroOffset.RData")
 save(warming, file = "I:/DATA/output/hist_micro/historical_warmingM.RData")
 save(plots_micro,
     file = "I:/DATA/output/MicroClimPlant_CIT/MicroClimP_REp3.1_1950s.RData"
 )
-load("I:/DATA/output/MicroClimPlant_CIT/MicroClimP_REp3.1_1950s.RData")

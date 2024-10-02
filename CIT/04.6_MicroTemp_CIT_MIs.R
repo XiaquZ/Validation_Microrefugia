@@ -19,14 +19,14 @@ head(plot_data)
 plotinfo <- plot_data[, c(1:3, 9:14)]
 
 # Add canopy cover change to the plot info.
+# Clean and separate the canopy cover data based on survey.
 load("I:/DATA/output/forestREplot/EU_TreeShrubL.RData")
 vegtreesh_totalC <- veg_treeshrub |>
     group_by(sample) |>
     summarise(total_cover = sum(abundance))
 head(vegtreesh_totalC)
-anyNA(vegtreesh_totalC$total_cover)
-# Get the canopy cover change per plot.
-# Baseline
+anyNA(vegtreesh_totalC$total_cover) #FALSE
+
 
 treeshrub <- vegtreesh_totalC[grep("_B", vegtreesh_totalC$sample), ]
 treeshrub$sample <- str_replace(treeshrub$sample, "_B", "") # get plotid.
@@ -38,6 +38,7 @@ r1 <- vegtreesh_totalC[grep("_R1", vegtreesh_totalC$sample), ] # 584 obs
 colnames(r1)[2] <- "R1"
 r1$sample <- str_replace(r1$sample, "_R1", "") # get plotid.
 head(r1) #4359
+
 # Merge survey data.
 treeshrub <- merge(treeshrub, r1, by = "sample", all = T)
 head(treeshrub)#4502 
@@ -51,7 +52,7 @@ head(r2)
 
 # merge r2 data to the plot data.
 treeshrub <- merge(treeshrub, r2, by = "sample", all = TRUE)
-head(treeshrub)
+head(treeshrub) #4502
 
 # Check which plots have a resurvey R3.
 r3 <- vegtreesh_totalC[grep("_R3", vegtreesh_totalC$sample), ] # 18 obs
