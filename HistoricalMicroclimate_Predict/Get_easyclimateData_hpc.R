@@ -23,6 +23,9 @@ split_polygons <- intersect(buffer_wgs, grid_p)
 plot(split_polygons)
 #writeVector(split_polygons, 'I:/DATA/easyclimate/output/split_polygons.shp', overwrite = TRUE)
 
+# # Convert the SpatVector into a list of individual tiles (to avoid transferring the whole object)
+# tiles_list <- lapply(1:nrow(split_polygons), function(i) split_polygons[i, ])
+
 #### Forloop ####
 # create a list to store the output.
 result <- list()

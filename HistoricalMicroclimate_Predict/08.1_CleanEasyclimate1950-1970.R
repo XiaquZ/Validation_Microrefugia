@@ -5,9 +5,13 @@ library(lubridate)
 load("I:/DATA/easyclimate/output/yearly_plot_tmean1950.RData")
 load("I:/DATA/easyclimate/input/dailyTmax_1951-1970.RData")
 load("I:/DATA/easyclimate/input/dailyTmin_1951-1970.RData")
+head(tasmin_yrs)
+head(tasmax_yrs)
 
 # Calculate the T mean by adding min and max together and average.
-tmean <- merge(tas_min, tas_max, by = c("date", "lon", "lat", "ID_coords"))
+tmean <- merge(tasmin_yrs, tasmax_yrs,
+    by = c("date", "lon", "lat", "ID_coords")
+)
 
 # Get the mean temperature.
 tmean <- tmean |>
@@ -47,6 +51,11 @@ yearly_annual_tmean <- monthly_tmean |>
         .groups = "drop"
     )
 head(yearly_annual_tmean)
+tail(yearly_annual_tmean)
+# save yearly data
+save(yearly_annual_tmean,
+    file = "I:/DATA/easyclimate/input/yearly_Tmean1950-1970.RData"
+)
 
 # Add the mean annual temp of 1950 to the data.
 head(yearly_tmean)
