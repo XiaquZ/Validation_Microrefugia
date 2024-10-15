@@ -95,3 +95,33 @@ save(warming, file = "I:/DATA/output/hist_micro/historical_warmingM.RData")
 save(plots_micro,
     file = "I:/DATA/output/MicroClimPlant_CIT/MicroClimP_REp3.1_1950s.RData"
 )
+
+#### Historical microclimate for buffer zones ####
+##################################################
+# Load data
+tmax_his <- rast(
+    "I:/DATA/easyclimate/input/Tiles/1950-1970/Tmax/Tmax_70kmBuffer_1950-1970.tif"
+)
+tmin_his <- rast(
+    "I:/DATA/easyclimate/input/Tiles/1950-1970/Tmin/Tmin_70kmBuffer_1950-1970.tif"
+)
+
+# Calculate macroclimate historical MAT.
+s <- c(tmax_his, tmin_his)
+tmat_hist <- mean(s, na.rm = TRUE)
+plot(tmat_hist)
+
+# Save the mean annual temp.
+writeRaster(tmat_hist,
+    filename = "I:/DATA/easyclimate/input/Tiles/1950-1970/Tmat_70kmBuffer_1950-1970.tif"
+)
+
+# Extract current offset data of buffer areas.
+offset_pre <- rast("I:/DATA/mean_annualOffset.tif")
+buffer <- vect("I:/DATA/output/REplotBuffer_shp/70kmBuffer_REplotAfter1950.shp")
+plot(buffer)
+offset_b <- crop(offset_pre, buffer, mask = TRUE)
+
+# Fit linear regression model between offset and macroclimate.
+reg1 <- lm(offset_b ~ macroclimate_current, data = micro_current)
+summary(reg1)
