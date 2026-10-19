@@ -10,3 +10,5 @@ load("I:/DATA/input/forestREplot/version3.1/veg.data_forestREplot_V3.1.RData")
 eu10b <- plot_data[grep("EU_010b", plot_data$plotID), ] # herb layer (H)
 
 # Plot with wrong latitude and longitude.
+# EU_082: latitude and longitude swapped (all 281 plots) -> corrected in
+# CIT/01_CleanData.R, saved as I:/DATA/output/forestREplot/EU_PlotData_v3.1.RData

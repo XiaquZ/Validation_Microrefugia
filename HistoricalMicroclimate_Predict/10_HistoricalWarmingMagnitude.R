@@ -38,7 +38,7 @@ plots_micro$warming_decade <- plots_micro$hist_warming / 5
 plots_micro$warmingPerYr <- plots_micro$hist_warming / 50
 
 # Drop the columns that will not be used anymore.
-plots_micro <- plots_micro[, -c(13:15)]
+#plots_micro <- plots_micro[, -c(13:15)]
 head(plots_micro)
 save(plots_micro,
     file = "I:/DATA/output/hist_micro/MicroClimP_REp3.1_1950s.RData"

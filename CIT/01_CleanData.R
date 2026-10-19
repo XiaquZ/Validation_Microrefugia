@@ -15,6 +15,17 @@ head(veg_data)
 # Select plots and vegetation data from Europe (and excluding that of North America)
 veg_EU <- veg_data[grep("EU_", veg_data$sample), ]
 plot_EU <- plot_data[grep("EU_", plot_data$plotID), ]
+
+# EU_082: latitude and longitude are swapped in v3.1 (all 281 plots at 10.0 N,
+# 51.5 E instead of 51.5 N, 10.0 E in central Germany) -> swap back.
+# Use the saved plot_EU (end of script) instead of plot_data for coordinates.
+i82 <- grepl("^EU_082_", plot_EU$plotID)
+lat82 <- plot_EU$latitude[i82]
+plot_EU$latitude[i82] <- plot_EU$longitude[i82]
+plot_EU$longitude[i82] <- lat82
+# All EU plots inside a Europe bounding box after the fix
+stopifnot(all(plot_EU$latitude > 34 & plot_EU$latitude < 72 &
+              plot_EU$longitude > -25 & plot_EU$longitude < 45))
 head(veg_EU)
 head(plot_EU)
 inspNA <- plot_EU[!is.na(plot_EU$n_quadrat_B), ] # all the columns are NA.
@@ -101,3 +112,5 @@ head(veg_treeshrub)
 # Save the total tree cover data for later explanatory.
 save(vegherb, file = "I:/DATA/output/forestREplot/EU_herbL.RData")
 save(veg_treeshrub, file = "I:/DATA/output/forestREplot/EU_TreeShrubL.RData")
+# EU plot data with corrected coordinates (EU_082)
+save(plot_EU, file = "I:/DATA/output/forestREplot/EU_PlotData_v3.1.RData")

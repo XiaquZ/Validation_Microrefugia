@@ -1,0 +1,247 @@
+Chunk 4 of 4: 35 species
+ [1] "binary_Aegonychon purpurocaeruleum.tif"
+ [2] "binary_Arabis turrita.tif"             
+ [3] "binary_Asperula taurina.tif"           
+ [4] "binary_Calamagrostis chalybaea.tif"    
+ [5] "binary_Cardamine glanduligera.tif"     
+ [6] "binary_Carex alba.tif"                 
+ [7] "binary_Carex loliacea.tif"             
+ [8] "binary_Carex strigosa.tif"             
+ [9] "binary_Cinna latifolia.tif"            
+[10] "binary_Clematis recta.tif"             
+[11] "binary_Cyclamen hederifolium.tif"      
+[12] "binary_Daphne laureola.tif"            
+[13] "binary_Diplazium sibiricum.tif"        
+[14] "binary_Epipogium aphyllum.tif"         
+[15] "binary_Galium odoratum.tif"            
+[16] "binary_Geranium lanuginosum.tif"       
+[17] "binary_Hacquetia epipactis.tif"        
+[18] "binary_Hordelymus europaeus.tif"       
+[19] "binary_Impatiens parviflora.tif"       
+[20] "binary_Lathyrus niger.tif"             
+[21] "binary_Lonicera alpigena.tif"          
+[22] "binary_Luzula luzulina.tif"            
+[23] "binary_Melittis melissophyllum.tif"    
+[24] "binary_Neottia cordata.tif"            
+[25] "binary_Oxalis acetosella.tif"          
+[26] "binary_Polystichum aculeatum.tif"      
+[27] "binary_Prunus lusitanica.tif"          
+[28] "binary_Pulmonaria saccharata.tif"      
+[29] "binary_Ranunculus cassubicus.tif"      
+[30] "binary_Ruscus aculeatus.tif"           
+[31] "binary_Schedonorus giganteus.tif"      
+[32] "binary_Senecio hercynicus.tif"         
+[33] "binary_Stellaria longifolia.tif"       
+[34] "binary_Veronica montana.tif"           
+[35] "binary_Viola mirabilis.tif"            
+Thermal niche: binary_Aegonychon purpurocaeruleum.tif (16:08) 
+  sampling round 1: 143,508 cells drawn, 23594 suitable so far, 163.3 min
+  sampling round 2: 501,145 cells drawn, 105595 suitable so far, 30.0 min
+  climate extraction: 8.6 min
+    user   system  elapsed 
+ 3102.08   107.13 12116.84 
+Thermal niche: binary_Arabis turrita.tif (19:30) 
+  sampling round 1: 143,507 cells drawn, 28174 suitable so far, 67.9 min
+  sampling round 2: 394,475 cells drawn, 105832 suitable so far, 2.2 min
+  climate extraction: 1.9 min
+   user  system elapsed 
+ 350.44   50.49 4320.23 
+Thermal niche: binary_Asperula taurina.tif (20:42) 
+  sampling round 1: 142,238 cells drawn, 11302 suitable so far, 57.4 min
+  sampling round 2: 1,191,516 cells drawn, 106547 suitable so far, 5.8 min
+  climate extraction: 6.3 min
+   user  system elapsed 
+ 603.50   74.39 4173.87 
+Thermal niche: binary_Calamagrostis chalybaea.tif (21:52) 
+  sampling round 1: 143,507 cells drawn, 1694 suitable so far, 82.1 min
+  sampling round 2: 8,977,129 cells drawn, 111752 suitable so far, 41.0 min
+  climate extraction: 4.5 min
+   user  system elapsed 
+2496.18  225.14 7654.64 
+Thermal niche: binary_Cardamine glanduligera.tif (00:00) 
+  sampling round 1: 143,507 cells drawn, 14104 suitable so far, 86.6 min
+  sampling round 2: 941,727 cells drawn, 108195 suitable so far, 4.7 min
+  climate extraction: 2.2 min
+   user  system elapsed 
+ 486.77   61.69 5609.84 
+Thermal niche: binary_Carex alba.tif (01:33) 
+  sampling round 1: 143,507 cells drawn, 52012 suitable so far, 81.6 min
+  sampling round 2: 142,785 cells drawn, 103733 suitable so far, 1.0 min
+  climate extraction: 3.1 min
+   user  system elapsed 
+ 311.03   39.88 5138.06 
+Thermal niche: binary_Carex loliacea.tif (02:59) 
+  sampling round 1: 143,507 cells drawn, 24259 suitable so far, 82.8 min
+  sampling round 2: 483,268 cells drawn, 106051 suitable so far, 2.5 min
+  climate extraction: 1.9 min
+   user  system elapsed 
+ 354.08   46.33 5232.86 
+Thermal niche: binary_Carex strigosa.tif (04:26) 
+  sampling round 1: 143,507 cells drawn, 14574 suitable so far, 76.7 min
+  sampling round 2: 906,472 cells drawn, 106613 suitable so far, 4.4 min
+  climate extraction: 1.8 min
+   user  system elapsed 
+ 467.45   58.55 4970.63 
+Thermal niche: binary_Cinna latifolia.tif (05:49) 
+  sampling round 1: 143,507 cells drawn, 7096 suitable so far, 81.2 min
+  sampling round 2: 2,024,608 cells drawn, 108525 suitable so far, 9.4 min
+  climate extraction: 1.1 min
+   user  system elapsed 
+ 718.31   77.65 5504.22 
+Thermal niche: binary_Clematis recta.tif (07:21) 
+  sampling round 1: 143,507 cells drawn, 40793 suitable so far, 92.1 min
+  sampling round 2: 224,606 cells drawn, 104586 suitable so far, 1.4 min
+  climate extraction: 1.8 min
+   user  system elapsed 
+ 325.23   47.69 5724.33 
+Thermal niche: binary_Cyclamen hederifolium.tif (08:56) 
+  sampling round 1: 143,507 cells drawn, 28776 suitable so far, 77.3 min
+  sampling round 2: 383,016 cells drawn, 105290 suitable so far, 2.1 min
+  climate extraction: 2.8 min
+   user  system elapsed 
+ 354.84   48.20 4934.69 
+Thermal niche: binary_Daphne laureola.tif (10:18) 
+  sampling round 1: 143,507 cells drawn, 23776 suitable so far, 81.9 min
+  sampling round 2: 496,127 cells drawn, 105424 suitable so far, 2.6 min
+  climate extraction: 1.3 min
+   user  system elapsed 
+ 358.95   48.31 5154.30 
+Thermal niche: binary_Diplazium sibiricum.tif (11:44) 
+  sampling round 1: 143,507 cells drawn, 2821 suitable so far, 82.0 min
+  sampling round 2: 5,326,724 cells drawn, 109893 suitable so far, 24.3 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+1549.38  147.36 6474.26 
+Thermal niche: binary_Epipogium aphyllum.tif (13:32) 
+  sampling round 1: 143,507 cells drawn, 26982 suitable so far, 96.2 min
+  sampling round 2: 418,674 cells drawn, 105317 suitable so far, 2.3 min
+  climate extraction: 1.7 min
+   user  system elapsed 
+ 370.22   49.78 6009.01 
+Thermal niche: binary_Galium odoratum.tif (15:12) 
+  sampling round 1: 143,507 cells drawn, 44748 suitable so far, 87.0 min
+  sampling round 2: 191,028 cells drawn, 104583 suitable so far, 1.2 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 306.34   43.82 5386.41 
+Thermal niche: binary_Geranium lanuginosum.tif (16:42) 
+  sampling round 1: 143,507 cells drawn, 3541 suitable so far, 78.3 min
+  sampling round 2: 4,211,255 cells drawn, 106312 suitable so far, 19.5 min
+  climate extraction: 1.1 min
+   user  system elapsed 
+1277.31  125.53 5933.59 
+Thermal niche: binary_Hacquetia epipactis.tif (18:21) 
+  sampling round 1: 143,507 cells drawn, 23665 suitable so far, 87.5 min
+  sampling round 2: 499,198 cells drawn, 106088 suitable so far, 2.6 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 364.57   49.67 5492.13 
+Thermal niche: binary_Hordelymus europaeus.tif (19:52) 
+  sampling round 1: 143,507 cells drawn, 16638 suitable so far, 87.5 min
+  sampling round 2: 774,719 cells drawn, 105521 suitable so far, 3.9 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 448.64   55.60 5577.64 
+Thermal niche: binary_Impatiens parviflora.tif (21:25) 
+  sampling round 1: 143,507 cells drawn, 46325 suitable so far, 85.4 min
+  sampling round 2: 179,084 cells drawn, 104856 suitable so far, 1.2 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 294.84   43.45 5282.10 
+Thermal niche: binary_Lathyrus niger.tif (22:53) 
+  sampling round 1: 143,507 cells drawn, 47307 suitable so far, 83.1 min
+  sampling round 2: 172,144 cells drawn, 104211 suitable so far, 1.1 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 294.12   41.83 5143.02 
+Thermal niche: binary_Lonicera alpigena.tif (00:19) 
+  sampling round 1: 143,507 cells drawn, 33374 suitable so far, 80.7 min
+  sampling round 2: 309,494 cells drawn, 104909 suitable so far, 1.7 min
+  climate extraction: 1.4 min
+   user  system elapsed 
+ 310.33   43.60 5030.04 
+Thermal niche: binary_Luzula luzulina.tif (01:43) 
+  sampling round 1: 143,507 cells drawn, 13835 suitable so far, 66.6 min
+  sampling round 2: 962,960 cells drawn, 106506 suitable so far, 4.7 min
+  climate extraction: 1.4 min
+   user  system elapsed 
+ 466.93   57.86 4360.36 
+Thermal niche: binary_Melittis melissophyllum.tif (02:56) 
+  sampling round 1: 143,507 cells drawn, 42982 suitable so far, 68.9 min
+  sampling round 2: 205,370 cells drawn, 104423 suitable so far, 1.3 min
+  climate extraction: 1.3 min
+   user  system elapsed 
+ 294.37   46.47 4289.46 
+Thermal niche: binary_Neottia cordata.tif (04:07) 
+  sampling round 1: 143,507 cells drawn, 45490 suitable so far, 87.6 min
+  sampling round 2: 185,296 cells drawn, 105224 suitable so far, 1.2 min
+  climate extraction: 1.6 min
+   user  system elapsed 
+ 308.19   43.40 5427.53 
+Thermal niche: binary_Oxalis acetosella.tif (05:38) 
+  sampling round 1: 143,507 cells drawn, 59208 suitable so far, 92.6 min
+  sampling round 2: 106,802 cells drawn, 103457 suitable so far, 0.8 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 285.06   39.47 5698.30 
+Thermal niche: binary_Polystichum aculeatum.tif (07:13) 
+  sampling round 1: 143,507 cells drawn, 34856 suitable so far, 86.5 min
+  sampling round 2: 289,596 cells drawn, 105290 suitable so far, 1.7 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 331.26   46.19 5382.36 
+Thermal niche: binary_Prunus lusitanica.tif (08:42) 
+  sampling round 1: 143,507 cells drawn, 12782 suitable so far, 88.6 min
+  sampling round 2: 1,054,926 cells drawn, 106778 suitable so far, 5.2 min
+  climate extraction: 1.6 min
+   user  system elapsed 
+ 514.86   65.48 5722.55 
+Thermal niche: binary_Pulmonaria saccharata.tif (10:18) 
+  sampling round 1: 143,507 cells drawn, 52157 suitable so far, 87.7 min
+  sampling round 2: 141,945 cells drawn, 103874 suitable so far, 1.0 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 292.08   42.92 5413.87 
+Thermal niche: binary_Ranunculus cassubicus.tif (11:48) 
+  sampling round 1: 143,507 cells drawn, 12243 suitable so far, 81.8 min
+  sampling round 2: 1,108,142 cells drawn, 107693 suitable so far, 5.4 min
+  climate extraction: 1.2 min
+   user  system elapsed 
+ 507.22   61.01 5303.39 
+Thermal niche: binary_Ruscus aculeatus.tif (13:16) 
+  sampling round 1: 143,507 cells drawn, 25541 suitable so far, 67.7 min
+  sampling round 2: 451,030 cells drawn, 105019 suitable so far, 2.4 min
+  climate extraction: 1.3 min
+   user  system elapsed 
+ 327.98   47.52 4284.23 
+Thermal niche: binary_Schedonorus giganteus.tif (14:28) 
+  sampling round 1: 143,507 cells drawn, 37689 suitable so far, 81.3 min
+  sampling round 2: 256,117 cells drawn, 105167 suitable so far, 1.6 min
+  climate extraction: 1.5 min
+   user  system elapsed 
+ 320.38   44.21 5064.01 
+Thermal niche: binary_Senecio hercynicus.tif (15:52) 
+  sampling round 1: 143,507 cells drawn, 10666 suitable so far, 88.9 min
+  sampling round 2: 1,294,729 cells drawn, 106648 suitable so far, 6.2 min
+  climate extraction: 1.0 min
+   user  system elapsed 
+ 546.59   64.75 5766.16 
+Thermal niche: binary_Stellaria longifolia.tif (17:28) 
+  sampling round 1: 143,507 cells drawn, 20336 suitable so far, 72.4 min
+  sampling round 2: 605,874 cells drawn, 107558 suitable so far, 3.2 min
+  climate extraction: 1.3 min
+   user  system elapsed 
+ 392.24   49.86 4609.81 
+Thermal niche: binary_Veronica montana.tif (18:45) 
+  sampling round 1: 143,507 cells drawn, 24531 suitable so far, 75.7 min
+  sampling round 2: 475,992 cells drawn, 105667 suitable so far, 2.6 min
+  climate extraction: 1.3 min
+   user  system elapsed 
+ 362.11   50.77 4779.85 
+Thermal niche: binary_Viola mirabilis.tif (20:05) 
+  sampling round 1: 143,507 cells drawn, 42110 suitable so far, 35.8 min
+  sampling round 2: 212,796 cells drawn, 104595 suitable so far, 1.3 min
+  climate extraction: 1.6 min
+   user  system elapsed 
+ 293.64   42.97 2320.19 
+Chunk finished: 2026-10-15 20:43:53 
