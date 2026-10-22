@@ -235,8 +235,9 @@ fr_to_sdm <- function(x) ifelse(x %in% names(syn_fr2sdm), unname(syn_fr2sdm[x]),
 
 niche_wide <- niches %>%
   mutate(species_key = norm_name(species)) %>%
-  dplyr::select(species_key, variable, value = all_of(niche_value), width) %>%
-  pivot_wider(names_from = variable, values_from = c(value, width))
+  # mean and optimum kept for the sensitivity check of the species value
+  dplyr::select(species_key, variable, value = all_of(niche_value), mean, optimum, width) %>%
+  pivot_wider(names_from = variable, values_from = c(value, mean, optimum, width))
 
 # Vegetation data of forestREplot v3.1, Europe (long format: sample, species_name,
 # layer, abundance). Layers: herb (H), shrub and herb not separated (SH) and shrub
@@ -304,6 +305,12 @@ cit_from <- function(d) {
       CIT_BIO6 = mean(value_BIO6),
       CIT_BIO5_w = weighted.mean(value_BIO5, 1 / width_BIO5),
       CIT_BIO6_w = weighted.mean(value_BIO6, 1 / width_BIO6),
+      # Sensitivity: niche mean or optimum instead of the median as species
+      # value (weighted like the main CIT)
+      CIT_BIO5_w_mean = weighted.mean(mean_BIO5, 1 / width_BIO5),
+      CIT_BIO6_w_mean = weighted.mean(mean_BIO6, 1 / width_BIO6),
+      CIT_BIO5_w_opt = weighted.mean(optimum_BIO5, 1 / width_BIO5),
+      CIT_BIO6_w_opt = weighted.mean(optimum_BIO6, 1 / width_BIO6),
       .groups = "drop"
     )
 }
@@ -338,6 +345,33 @@ cit %>%
     max_abs_diff_BIO6 = max(abs(CIT_BIO6 - CIT_BIO6_herb), na.rm = TRUE)
   )
 
+# Sensitivity check: species value. De Frenne et al. (2013) resampled whole
+# thermal distributions (part 3); the simple CIT needs one value per species.
+# A high correlation means the choice (median, mean or optimum of the niche)
+# does not change the pattern among plots; a mean difference only shifts the level.
+#
+# Results (2026-10-19, 8,703 plot-surveys, weighted CIT):
+#   - herb + shrub vs herb only: r = 0.997 (BIO5 and BIO6), mean difference
+#     ~0 deg C, max. 1.7 (BIO5) / 1.6 (BIO6) deg C in single plots;
+#     365 plot-surveys gain shrub-layer species
+#   - median vs mean: r = 0.990 (BIO5), 0.998 (BIO6); level +0.53 / +0.07 deg C
+#   - median vs optimum: r = 0.888 (BIO5), 0.953 (BIO6); level -1.16 / -0.29 deg C
+#     (optimum unstable for skewed BIO5 niches, e.g. Allium ursinum) -> median kept
+#   These correlations include the large spatial gradient among plots; compare
+#   the rates (part 4) for the temporal change.
+cit %>%
+  summarise(
+    r_BIO5_mean = cor(CIT_BIO5_w, CIT_BIO5_w_mean),
+    r_BIO5_opt = cor(CIT_BIO5_w, CIT_BIO5_w_opt),
+    r_BIO6_mean = cor(CIT_BIO6_w, CIT_BIO6_w_mean),
+    r_BIO6_opt = cor(CIT_BIO6_w, CIT_BIO6_w_opt),
+    mean_diff_BIO5_mean = mean(CIT_BIO5_w_mean - CIT_BIO5_w),
+    mean_diff_BIO5_opt = mean(CIT_BIO5_w_opt - CIT_BIO5_w),
+    mean_diff_BIO6_mean = mean(CIT_BIO6_w_mean - CIT_BIO6_w),
+    mean_diff_BIO6_opt = mean(CIT_BIO6_w_opt - CIT_BIO6_w)
+  ) %>%
+  pivot_longer(everything())
+
 # plot_species and not_monitored are needed to compute CIT changes between two
 # surveys from the species monitored in both
 save(cit, niches, plot_species, not_monitored, not_surveyed,
@@ -349,18 +383,38 @@ save(cit, niches, plot_species, not_monitored, not_surveyed,
 # De Frenne et al. (2013, PNAS): instead of one value per species, draw one
 # temperature value per species from its thermal distribution, average over the
 # species in the plot (floristic temperature, FT) and take the 5th / 95th
-# percentiles (cold tail LT, warm tail RT); repeat 500 times. This propagates niche
-# width and uncertainty.
+# percentiles (cold tail LT, warm tail RT); repeat n_boot times. This propagates niche
+# width and uncertainty. LT and RT are taken per draw over the species' sampled
+# values, as in their SI Fig. S3 (one value per species -> FT, LT, RT -> change ->
+# models, the whole procedure repeated for every draw).
 # As in the CIT of part 2, each statistic is also computed with the species
 # weighted by inverse niche width (*_w: weighted mean and weighted 5th / 95th
-# percentiles), so that narrow-niche species carry more information. The draws
-# already reflect niche width, so the weighting adds to that; the unweighted
-# values follow De Frenne et al. exactly.
+# percentiles), so that narrow-niche species carry more information.
+# This is not double counting: in each draw every species counts equally in the
+# unweighted FT, and a broad niche only makes its draws more variable (wider
+# interval over the draws, more influence on the tails LT / RT). Over the draws,
+# the unweighted FT converges to the equal-weight average of the species' niche
+# means. The weighting changes how much each species counts; the draws give the
+# uncertainty. The unweighted values follow De Frenne et al. exactly.
 # Draws come from the suitable-area samples saved in part 1 (the SDM-based
 # equivalent of their response curves). One cell is drawn per species and draw,
 # so BIO5 and BIO6 stay paired at the same location.
 sample_dir <- file.path(out_dir, "samples")
-n_boot <- 500
+# Number of draws. Check (2026-10-21): Monte Carlo SE of the 2.5% / 97.5% bounds
+# (sd over 200 resamples of the draws) relative to the 95% interval width, for
+# 1,000 random plot-surveys. Target: below 5% for 95% of plot-surveys, every index.
+# De Frenne et al. 2013 (PNAS) used 500 draws for the thermophilization (mean
+# FT), and 999 bootstrap samples for the 95% CIs of their Lennon index.
+# n_boot = 500: means precise and most bounds fine, but
+#   LT_BIO6 lo: 32% of plot-surveys > 5% (q95 7.4%); LT_BIO6_w lo: 52% (q95 10%);
+#   RT_BIO6 hi 12%, FT_BIO5 hi 9%. LT of BIO6 has long cold tails, and the
+#   weighted quantile (no interpolation) jumps between species values.
+# n_boot = 1000 (2026-10-22): 22 of 24 index bounds have <= 0.1% of plot-surveys
+#   > 5% (q95 <= 4.7%); LT_BIO6 lo 2.7%. Still above target: LT_BIO6_w lo 10.3%
+#   (q95 5.9%, max 9.1%) and RT_BIO6_w hi 14.4% (q95 5.7%, max 6.9%; worse than
+#   at 500, so not only a sample-size effect: the weighted quantile jumps between
+#   species values, and a quantile near such a gap converges slowly).
+n_boot <- 1000
 
 set.seed(16)
 sp_files <- list.files(sample_dir, pattern = "\\.rds$", full.names = TRUE)
@@ -422,7 +476,7 @@ ft_boot <- ft_boot %>%
     surveyTyp = sub("^.*_", "", sample)
   )
 
-# Per plot-survey summary over the 500 draws (for maps / quick checks). The
+# Per plot-survey summary over the n_boot draws (for maps / quick checks). The
 # change over time is computed per draw in part 4, as in De Frenne et al.
 ft_summary <- ft_boot %>%
   group_by(sample, plotID, surveyTyp, n_species) %>%
@@ -430,7 +484,41 @@ ft_summary <- ft_boot %>%
     list(mean = mean, lo = ~ quantile(.x, 0.025), hi = ~ quantile(.x, 0.975))
   ), .groups = "drop")
 
-save(ft_boot, ft_summary, file = "I:/DATA/output/CIT/FloristicTemp_boot_SDMniche_BIO5_BIO6.RData")
+save(ft_boot, ft_summary,
+     file = paste0("I:/DATA/output/CIT/FloristicTemp_boot", n_boot, "_SDMniche_BIO5_BIO6.RData"))
+
+# Monte Carlo precision of the 95% interval bounds (results in the comment above
+# n_boot). Per plot-survey and index: sd of the 2.5% / 97.5% bound over 200
+# resamples of the draws, relative to the interval width. Summary over 1,000
+# random plot-surveys: share above 5% of the interval width. Prints only.
+run_mc_check <- FALSE
+mc_ratio <- function(x) {
+  q_lo <- replicate(200, quantile(sample(x, replace = TRUE), .025))
+  q_hi <- replicate(200, quantile(sample(x, replace = TRUE), .975))
+  w <- unname(diff(quantile(x, c(.025, .975))))
+  c(lo = sd(q_lo) / w, hi = sd(q_hi) / w)
+}
+mc_check <- function(boot, id, cols, n_sub = 1000) {
+  set.seed(1)
+  sub <- sample(unique(boot[[id]]), min(n_sub, n_distinct(boot[[id]])))
+  boot %>%
+    filter(.data[[id]] %in% sub) %>%
+    group_by(.data[[id]]) %>%
+    summarise(across(all_of(cols), ~ list(mc_ratio(.x))), .groups = "drop") %>%
+    pivot_longer(all_of(cols), names_to = "index") %>%
+    unnest_wider(value) %>%
+    pivot_longer(c(lo, hi), names_to = "bound", values_to = "ratio") %>%
+    group_by(index, bound) %>%
+    summarise(median = median(ratio, na.rm = TRUE),
+              q95 = quantile(ratio, .95, na.rm = TRUE),
+              max = max(ratio, na.rm = TRUE),
+              pct_over_5 = 100 * mean(ratio > 0.05, na.rm = TRUE),
+              .groups = "drop")
+}
+if (run_mc_check) {
+  print(mc_check(ft_boot, "sample", grep("^(FT|LT|RT)_BIO[56]", names(ft_boot), value = TRUE)),
+        n = Inf)
+}
 
 ####################################################################################
 #####################   4. Temporal change: delta CIT per year  ####################
@@ -446,9 +534,11 @@ save(ft_boot, ft_summary, file = "I:/DATA/output/CIT/FloristicTemp_boot_SDMniche
 #
 # Counts (2026-10-19; they depend on the species lists only, not on the niche
 # values; EU_009b and EU_010a excluded, min_species = 3):
-#   - 3,059 plots get a delta CIT, of 3,770 plots with a CIT (the others have
-#     only one survey with enough species)
-#   - interval length: median 33 years, range 3-78
+#   - 3,059 plots have a usable interval, of 3,770 plots with a CIT (the others
+#     have only one survey with enough species); with min_years = 10 (added
+#     2026-10-20), 3,041 plots get a delta CIT
+#   - interval length: median 33 years, range 3-78 (10-78 with min_years = 10)
+#   - rates in deg C per year (De Frenne et al. 2013: per decade, i.e. x 10)
 #   - baseline moved to a later survey in 45 plots, end moved to an earlier
 #     survey in 64 plots, because of too few species
 #   - EU_040: interval 1988 -> 2015; the 2008 resurvey, in which the vernal
@@ -504,12 +594,18 @@ pair_species <- bind_rows(
     mutate(survey = "e", sample = sample_e)
 )
 
-# Longest interval with >= min_species species in both surveys (ties: earliest
-# baseline)
+# Minimum interval: rates over a few years are dominated by noise. De Frenne et
+# al. (2013) required at least 10 years between surveys (SI; intervals 12-67 years). Here 10 years costs 18 plots (5 years:
+# 10 plots), all from EU_009a, EU_010b and EU_015, whose longer intervals have
+# fewer than min_species species in one survey (checked 2026-10-20).
+min_years <- 10
+
+# Longest interval with >= min_species species in both surveys and at least
+# min_years long (ties: earliest baseline)
 chosen <- pair_species %>%
   count(plotID, sample_b, sample_e, year_b, year_e, survey) %>%
   pivot_wider(names_from = survey, values_from = n, values_fill = 0) %>%
-  filter(b >= min_species, e >= min_species) %>%
+  filter(b >= min_species, e >= min_species, year_e - year_b >= min_years) %>%
   group_by(plotID) %>%
   arrange(desc(year_e - year_b), year_b, .by_group = TRUE) %>%
   slice(1) %>%
@@ -568,5 +664,34 @@ chosen %>%
 cit_change %>%
   summarise(across(starts_with("dCIT"), ~ mean(.x, na.rm = TRUE)))
 
+# Sensitivity of the rates (main: De Frenne floristic temperature FT of part 3,
+# weighted by inverse niche width, mean of the draws, herb + shrub): correlation
+# with the unweighted FT and with the simple CIT of part 2 (one value per species:
+# niche median, mean or optimum; herb + shrub or herb layer only). The herb-only
+# check is done on the CIT only: it depends on the species set, which is the same
+# for FT and CIT.
+rate_cmp <- cit_change %>%
+  left_join(dplyr::select(ft_change_summary, plotID,
+                          matches("^dFT_BIO[56](_w)?_yr_mean$")),
+            by = "plotID")
+bind_rows(lapply(c("BIO5", "BIO6"), function(v) {
+  main <- rate_cmp[[paste0("dFT_", v, "_w_yr_mean")]]
+  alt <- c(FT_unweighted = paste0("dFT_", v, "_yr_mean"),
+           CIT_median = paste0("dCIT_", v, "_w_yr"), CIT_mean = paste0("dCIT_", v, "_w_mean_yr"),
+           CIT_optimum = paste0("dCIT_", v, "_w_opt_yr"),
+           CIT_herb_only = paste0("dCIT_", v, "_w_herb_yr"), CIT_unweighted = paste0("dCIT_", v, "_yr"))
+  data.frame(variable = v, version = names(alt),
+             r = vapply(alt, function(a) cor(main, rate_cmp[[a]], use = "complete.obs"), 0),
+             mean_main = mean(main, na.rm = TRUE),
+             mean_version = vapply(alt, function(a) mean(rate_cmp[[a]], na.rm = TRUE), 0))
+}))
+
 save(cit_change, ft_change_boot, ft_change_summary, survey_year,
-     file = "I:/DATA/output/CIT/CIT_change_SDMniche_BIO5_BIO6.RData")
+     file = paste0("I:/DATA/output/CIT/CIT_change_boot", n_boot, "_SDMniche_BIO5_BIO6.RData"))
+
+# Monte Carlo precision of the 95% intervals of the rates (as in part 3, per plot)
+if (run_mc_check) {
+  print(mc_check(ft_change_boot, "plotID",
+                 grep("^d(FT|LT|RT)_BIO[56]", names(ft_change_boot), value = TRUE)),
+        n = Inf)
+}
