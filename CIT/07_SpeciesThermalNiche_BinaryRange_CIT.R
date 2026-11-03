@@ -455,7 +455,7 @@ ft_stats <- function(i) {
   out <- data.frame(boot = seq_len(n_boot))
   for (v in names(draws)) {
     m <- draws[[v]][i, , drop = FALSE]
-    w <- inv_width[[v]][i]
+    w <- inv_width[[v]][i]  
     out[[paste0("FT_", v)]] <- colMeans(m)
     out[[paste0("LT_", v)]] <- apply(m, 2, quantile, probs = 0.05)
     out[[paste0("RT_", v)]] <- apply(m, 2, quantile, probs = 0.95)
@@ -521,7 +521,7 @@ if (run_mc_check) {
 }
 
 ####################################################################################
-#####################   4. Temporal change: delta CIT per year  ####################
+#####################  4. Temporal change: delta CIT per decade  ###################
 ####################################################################################
 # One interval per plot: from the baseline to the most recent resurvey, as in De
 # Frenne et al. (2013). Only species monitored in both surveys are used
@@ -537,10 +537,12 @@ if (run_mc_check) {
 #   - 3,059 plots have a usable interval, of 3,770 plots with a CIT (the others
 #     have only one survey with enough species); with min_years = 10 (added
 #     2026-10-20), 3,041 plots get a delta CIT
-#   - interval length: median 33 years, range 3-78 (10-78 with min_years = 10)
-#   - rates in deg C per year (De Frenne et al. 2013: per decade, i.e. x 10)
+#   - interval length: median 33 years, range 3-78; with min_years = 10
+#     (checked 2026-10-27): median 34, range 10-78
+#   - rates in deg C per decade, as in De Frenne et al. (2013)
 #   - baseline moved to a later survey in 45 plots, end moved to an earlier
-#     survey in 64 plots, because of too few species
+#     survey in 64 plots, because of too few species; with min_years = 10:
+#     34 and 56 plots (lower because min_years removes 18 plots)
 #   - EU_040: interval 1988 -> 2015; the 2008 resurvey, in which the vernal
 #     species were not monitored, is skipped
 #
@@ -595,7 +597,8 @@ pair_species <- bind_rows(
 )
 
 # Minimum interval: rates over a few years are dominated by noise. De Frenne et
-# al. (2013) required at least 10 years between surveys (SI; intervals 12-67 years). Here 10 years costs 18 plots (5 years:
+# al. (2013) required at least 10 years between surveys (SI; intervals 12-67 years).
+# Here 10 years costs 18 plots (5 years:
 # 10 plots), all from EU_009a, EU_010b and EU_015, whose longer intervals have
 # fewer than min_species species in one survey (checked 2026-10-20).
 min_years <- 10
@@ -627,12 +630,23 @@ cit_change <- chosen %>%
   left_join(rename_with(cit_pair, ~ paste0(.x, "_b"), -sample), by = c("sample_b" = "sample")) %>%
   left_join(rename_with(cit_pair, ~ paste0(.x, "_e"), -sample), by = c("sample_e" = "sample"))
 for (v in grep("^CIT_", names(cit_pair), value = TRUE)) {
-  cit_change[[paste0("d", v, "_yr")]] <-
-    (cit_change[[paste0(v, "_e")]] - cit_change[[paste0(v, "_b")]]) / cit_change$n_years
+  cit_change[[paste0("d", v, "_dec")]] <-
+    (cit_change[[paste0(v, "_e")]] - cit_change[[paste0(v, "_b")]]) / (cit_change$n_years / 10)
 }
 
-# De Frenne values: FT, LT, RT per draw from the same species, change per year
-# per draw, then the mean and 95% interval over the draws
+# De Frenne values: FT, LT, RT per draw from the same species, change per decade
+# per draw, then the mean and 95% interval over the draws.
+# Recomputed instead of reusing ft_boot of part 3, because:
+#   - species set: ft_boot uses all species of a plot-survey; here only the
+#     species monitored in both surveys of the chosen pair (chg_species)
+#   - per-draw change: both surveys use the same draw matrices, so a species
+#     present in both gets the same value in draw b in both surveys. Its value
+#     largely cancels out: only the change in its share (1 / n, or w / sum(w)
+#     for *_w) remains, which is small unless the turnover is large. For LT / RT
+#     (percentiles) there is no exact cancellation, but both surveys move
+#     together. The interval thus mainly reflects species turnover. Subtracting
+#     the ft_summary bounds would treat the surveys as independent and give far
+#     too wide intervals.
 chg_idx <- split(match(chg_species$species_key, sp_keys), chg_species$sample)
 chg_idx <- lapply(chg_idx, function(i) i[!is.na(i)])
 ft_change_boot <- bind_rows(lapply(seq_len(nrow(chosen)), function(k) {
@@ -640,8 +654,8 @@ ft_change_boot <- bind_rows(lapply(seq_len(nrow(chosen)), function(k) {
   sb <- ft_stats(chg_idx[[p$sample_b]])
   se <- ft_stats(chg_idx[[p$sample_e]])
   st <- setdiff(names(sb), "boot")
-  d <- (se[st] - sb[st]) / p$n_years
-  names(d) <- paste0("d", st, "_yr")
+  d <- (se[st] - sb[st]) / (p$n_years / 10)
+  names(d) <- paste0("d", st, "_dec")
   data.frame(plotID = p$plotID, boot = sb$boot, d)
 }))
 ft_change_summary <- ft_change_boot %>%
@@ -670,20 +684,33 @@ cit_change %>%
 # niche median, mean or optimum; herb + shrub or herb layer only). The herb-only
 # check is done on the CIT only: it depends on the species set, which is the same
 # for FT and CIT.
+#
+# Results (2026-10-27, 3,041 plots, n_boot = 1000; run per year, converted here
+# to per decade): main rate 0.012 (BIO5) and 0.030 (BIO6) deg C per decade.
+#   r with the main rate (BIO5 / BIO6), mean rate of the version:
+#   - FT unweighted:   0.987 / 0.977;  0.012 / 0.027
+#   - CIT median:      0.987 / 0.994;  0.0095 / 0.029
+#   - CIT mean:        0.997 / 0.999;  0.012 / 0.030 (expected: the mean FT
+#     over the draws converges to the CIT of the niche means)
+#   - CIT optimum:     0.783 / 0.899;  0.0014 / 0.028 (BIO5 rate 9x lower:
+#     unstable optimum of skewed BIO5 niches, as in part 2)
+#   - CIT herb only:   0.977 / 0.985;  0.010 / 0.028
+#   - CIT unweighted:  0.967 / 0.967;  0.0094 / 0.026
 rate_cmp <- cit_change %>%
   left_join(dplyr::select(ft_change_summary, plotID,
-                          matches("^dFT_BIO[56](_w)?_yr_mean$")),
+                          matches("^dFT_BIO[56](_w)?_dec_mean$")),
             by = "plotID")
 bind_rows(lapply(c("BIO5", "BIO6"), function(v) {
-  main <- rate_cmp[[paste0("dFT_", v, "_w_yr_mean")]]
-  alt <- c(FT_unweighted = paste0("dFT_", v, "_yr_mean"),
-           CIT_median = paste0("dCIT_", v, "_w_yr"), CIT_mean = paste0("dCIT_", v, "_w_mean_yr"),
-           CIT_optimum = paste0("dCIT_", v, "_w_opt_yr"),
-           CIT_herb_only = paste0("dCIT_", v, "_w_herb_yr"), CIT_unweighted = paste0("dCIT_", v, "_yr"))
+  main <- rate_cmp[[paste0("dFT_", v, "_w_dec_mean")]]
+  alt <- c(FT_unweighted = paste0("dFT_", v, "_dec_mean"),
+           CIT_median = paste0("dCIT_", v, "_w_dec"), CIT_mean = paste0("dCIT_", v, "_w_mean_dec"),
+           CIT_optimum = paste0("dCIT_", v, "_w_opt_dec"),
+           CIT_herb_only = paste0("dCIT_", v, "_w_herb_dec"), CIT_unweighted = paste0("dCIT_", v, "_dec"))
   data.frame(variable = v, version = names(alt),
              r = vapply(alt, function(a) cor(main, rate_cmp[[a]], use = "complete.obs"), 0),
              mean_main = mean(main, na.rm = TRUE),
-             mean_version = vapply(alt, function(a) mean(rate_cmp[[a]], na.rm = TRUE), 0))
+             mean_version = vapply(alt, function(a) mean(rate_cmp[[a]], na.rm = TRUE), 0),
+             row.names = NULL)
 }))
 
 save(cit_change, ft_change_boot, ft_change_summary, survey_year,

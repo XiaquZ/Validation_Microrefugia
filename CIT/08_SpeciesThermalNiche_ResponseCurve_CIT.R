@@ -8,18 +8,22 @@ library(ggplot2)
 #   Species thermal niches (BIO5, BIO6) from the SDM response curves, and
 #   community-inferred temperature (CIT).
 #
-#   Alternative to 07_SpeciesThermalNiche_CIT.R, which samples climate inside the
-#   binary SDM range. Here the niche comes from the fitted model itself:
-#     - Model: the ENMeval maxnet model with the lowest delta AICc per species.
-#     - Response curve: partial dependence over the occurrence points. BIO5 / BIO6
-#       is set to each value of a grid (varmin - varmax of the training data) at
-#       every occurrence, keeping the other predictors at their observed values,
-#       and the cloglog suitability is averaged. The models contain many product
-#       features (e.g. BIO5:BIO6, BIO6:clay), so the classic marginal curve (other
-#       predictors at their sample means) is only one slice; it is saved too
-#       for comparison.
-#     - Niche statistics: the curve is normalised to a density over the grid ->
-#       Q05, median, mean, Q95, width; optimum = temperature of max suitability.
+#   MAIN ANALYSIS. Replaces the binary-range sampling of
+#   07_SpeciesThermalNiche_BinaryRange_CIT.R: the niche comes from the fitted
+#   model itself, without thresholding. The partial-dependence version is kept as
+#   a sensitivity check in 08.1_SpeciesThermalNiche_PartialDependence_Sensitivity.R.
+#     - Model: the ENMeval maxnet model(s) with the lowest delta AICc per species
+#       (10_TrainCurrentSDMs.R: SWD, raw predictor values, 10,000 background
+#       points from the 1000 km buffer-overlap surface). Ties are averaged.
+#     - Response curve: realised relative occurrence rate along BIO5 /
+#       BIO6. Raw maxnet output (estimates f1(z)/f(z)) is predicted at the
+#       background points and averaged along temperature with a Gaussian kernel.
+#       The background is the reference distribution f(z) of the model, so no
+#       extra weights. Other predictors vary with temperature as they do in the
+#       background (not a partial-dependence curve). Rescaled to max = 1; grid
+#       values with too few background points nearby (eff_n < min_eff_n) are NA.
+#     - Niche statistics: the realised curve is normalised to a density over the
+#       grid -> Q05, median, mean, Q95, width; optimum = temperature of max rate.
 #   The output table has the same columns as in script 07, so the CIT step is the
 #   same.
 ####################################################################################
@@ -28,33 +32,51 @@ library(ggplot2)
 mdl_dir     <- "I:/DATA/SDM_current/models/"
 mdl_pattern <- "_ENMeval_swd\\.RData$"
 out_dir     <- "I:/DATA/SDM_current/ThermalNiche/"
+# Added to every output name; the same names without the tag are the
+# partial-dependence results of script 08.1
+method_tag  <- "_RawBG"
 vars <- c(
   BIO5 = "Micro_BIO5_EU_CHELSAbased_2000.2020",
   BIO6 = "Micro_BIO6_EU_CHELSAbased_2000.2020"
 )
-n_grid <- 200 # temperature values along each response curve
+n_grid    <- 200 # temperature values along each response curve
+bw        <- 0.5 # kernel SD (°C) for the realised curve
+min_eff_n <- 30  # minimum effective number of background points per grid value
+edge_tol  <- 1   # optimum within this distance (°C) of a curve end -> edge_opt
 
 ####################################################################################
 #####################   1. Response curves and thermal niche  ######################
 ####################################################################################
-# Partial dependence: all occurrences x all grid values in one predict() call
-resp_pdp <- function(mdl, var, env, x) {
-  nd <- env[rep(seq_len(nrow(env)), times = length(x)), , drop = FALSE]
-  nd[[var]] <- rep(x, each = nrow(env))
-  p <- as.numeric(predict(mdl, nd, type = "cloglog", clamp = TRUE))
-  as.numeric(tapply(p, rep(seq_along(x), each = nrow(env)), mean))
+# Raw output of the selected model(s) at the background points. Each model is
+# scaled to sum to 1 (as MaxEnt raw output), so tied models can be averaged;
+# subtracting max(lp) avoids overflow in exp().
+raw_bg <- function(mdls, env_bg) {
+  raw <- lapply(mdls, function(m) {
+    lp <- as.numeric(predict(m, env_bg, type = "link", clamp = FALSE))
+    r <- exp(lp - max(lp))
+    r / sum(r)
+  })
+  Reduce(`+`, raw) / length(raw)
 }
 
-# Marginal curve: other predictors at their sample means
-resp_marginal <- function(mdl, var, x) {
-  nd <- as.data.frame(as.list(mdl$samplemeans))
-  nd <- nd[rep(1, length(x)), , drop = FALSE]
-  nd[[var]] <- x
-  as.numeric(predict(mdl, nd, type = "cloglog", clamp = TRUE))
+# Realised curve: kernel (Nadaraya-Watson) mean of raw output at each grid value.
+# eff_n = Kish's effective number of background points behind that value.
+resp_realised <- function(t_bg, raw, x) {
+  K <- outer(x, t_bg, function(g, ti) dnorm(ti, mean = g, sd = bw))
+  sum_k <- rowSums(K)
+  r <- as.numeric(K %*% raw) / sum_k
+  eff_n <- sum_k^2 / rowSums(K^2)
+  ok <- sum_k > 0 & eff_n >= min_eff_n
+  r[is.na(ok) | !ok] <- NA
+  data.frame(rate = r / max(r, na.rm = TRUE), eff_n = eff_n)
 }
 
 # Niche statistics from a curve treated as a density over the grid
+# (NA grid values, i.e. outside the background support, are dropped)
 curve_stats <- function(x, suit) {
+  keep <- !is.na(suit)
+  x <- x[keep]
+  suit <- suit[keep]
   w <- suit / sum(suit)
   cdf <- cumsum(w)
   q <- function(p) x[which(cdf >= p)[1]]
@@ -65,10 +87,11 @@ curve_stats <- function(x, suit) {
     optimum = x[which.max(suit)],
     Q95 = q(0.95),
     width = q(0.95) - q(0.05),
-    max_suit = max(suit),
-    # TRUE: optimum at the edge of the training range -> monotonic curve,
-    # optimum (and to a lesser extent the other statistics) truncated
-    edge_opt = which.max(suit) %in% c(1, length(x))
+    # TRUE: optimum within edge_tol of the edge of the supported range ->
+    # monotonic curve, optimum (and to a lesser extent the other statistics)
+    # truncated. A tolerance, as small wiggles at the cut-off can put the
+    # maximum a few grid values inside the edge.
+    edge_opt = min(abs(x[which.max(suit)] - range(x))) <= edge_tol
   )
 }
 
@@ -78,40 +101,41 @@ niche_one_species <- function(mdl_file, vars, n_grid) {
   load(mdl_file, envir = e) # e.swd
   e.swd <- e$e.swd
 
-  # Best model: minimum delta AICc (which.min also handles ties and NAs)
+  # Selected model(s): minimum delta AICc, ties averaged (which() drops NA AICc)
   res <- eval.results(e.swd)
-  best <- which.min(res$delta.AICc)
-  mdl <- e.swd@models[[best]]
+  if (all(is.na(res$delta.AICc))) stop("delta.AICc is NA for every setting: ", species_name)
+  best <- which(res$delta.AICc == min(res$delta.AICc, na.rm = TRUE))
+  mdls <- e.swd@models[best]
+  mdl <- mdls[[1]]
 
-  # Occurrences with their predictor values (SWD); keep the model predictors only
+  # Background with its predictor values (SWD); model predictors only
   pred_names <- names(mdl$samplemeans)
-  stopifnot(all(pred_names %in% names(e.swd@occs)))
-  env <- e.swd@occs[, pred_names]
+  stopifnot(all(pred_names %in% names(e.swd@bg)))
+  env_bg <- e.swd@bg[, pred_names]
+  raw <- raw_bg(mdls, env_bg)
 
-  # Which temperature features are retained in the model
-  feats <- names(mdl$betas)
+  # Which temperature features are retained (union over tied models)
+  feats <- unique(unlist(lapply(mdls, function(m) names(m$betas))))
 
   curves <- list()
   stats <- list()
   for (v in names(vars)) {
     var <- vars[[v]]
     x <- seq(mdl$varmin[[var]], mdl$varmax[[var]], length.out = n_grid)
-    suit_pdp <- resp_pdp(mdl, var, env, x)
-    suit_mar <- resp_marginal(mdl, var, x)
+    rc <- resp_realised(env_bg[[var]], raw, x)
 
     curves[[v]] <- data.frame(
       species = species_name, variable = v, x = x,
-      suit_pdp = suit_pdp, suit_marginal = suit_mar
+      rate = rc$rate, eff_n = rc$eff_n
     )
     stats[[v]] <- data.frame(
       species = species_name,
       variable = v,
-      curve_stats(x, suit_pdp),
-      # optimum of the marginal curve, to see how much the interactions matter
-      optimum_marginal = x[which.max(suit_mar)],
-      n_feat_var = sum(grepl(var, feats, fixed = TRUE)), # 0 -> flat curve
-      n_occs = nrow(env),
-      tune_args = as.character(res$tune.args[best])
+      curve_stats(x, rc$rate),
+      n_feat_var = sum(grepl(var, feats, fixed = TRUE)), # 0 -> only via correlated predictors
+      n_occs = nrow(e.swd@occs),
+      n_bg = nrow(env_bg),
+      tune_args = paste(as.character(res$tune.args[best]), collapse = " | ")
     )
   }
   list(stats = do.call(rbind, stats), curves = do.call(rbind, curves))
@@ -124,7 +148,8 @@ mdl_files <- list.files(mdl_dir, pattern = mdl_pattern, full.names = TRUE)
 # test_species is empty) and write to a separate *_TEST.csv.
 # FALSE: run all species.
 test_run     <- TRUE
-test_species <- c("Viola reichenbachiana", "Paris quadrifolia") # e.g. c("Paris quadrifolia", "Anemone nemorosa")
+test_species <- c("Viola reichenbachiana", "Paris quadrifolia", "Actaea spicata",
+                  "Brachypodium sylvaticum", "Calamagrostis chalybaea")
 n_test       <- 3
 
 if (test_run) {
@@ -148,32 +173,33 @@ rownames(curves_rc) <- NULL
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 suffix <- if (test_run) "_TEST" else ""
-write.csv(niches_rc, file.path(out_dir, paste0("Species_ThermalNiche_ResponseCurve_BIO5_BIO6", suffix, ".csv")),
+write.csv(niches_rc, file.path(out_dir, paste0("Species_ThermalNiche_ResponseCurve_BIO5_BIO6", method_tag, suffix, ".csv")),
   row.names = FALSE
 )
-saveRDS(curves_rc, file.path(out_dir, paste0("Species_ResponseCurves_BIO5_BIO6", suffix, ".rds")))
+saveRDS(curves_rc, file.path(out_dir, paste0("Species_ResponseCurves_BIO5_BIO6", method_tag, suffix, ".rds")))
 
-# Checks: monotonic curves (optimum at the range edge), temperature not in the
-# model (flat curve), and large shifts between partial dependence and marginal optimum
+# Unit check: bw assumes °C (BIO5 roughly 10 to 35, BIO6 roughly -20 to 5)
+curves_rc %>%
+  filter(!is.na(rate)) %>%
+  group_by(variable) %>%
+  summarise(min = min(x), max = max(x))
+
+# Checks: monotonic curves (optimum at the range edge) and temperature not in the model
 niches_rc %>% filter(edge_opt | n_feat_var == 0)
-niches_rc %>% mutate(opt_shift = optimum - optimum_marginal) %>% arrange(desc(abs(opt_shift)))
 
-# Test check: partial dependence vs marginal curve, with Q05, median and Q95
+# Test check: response curves with Q05, median and Q95
 if (test_run) {
   for (sp in unique(curves_rc$species)) {
-    d <- curves_rc %>%
-      filter(species == sp) %>%
-      pivot_longer(c(suit_pdp, suit_marginal), names_to = "method", values_to = "suit")
+    d <- filter(curves_rc, species == sp, !is.na(rate))
     s <- filter(niches_rc, species == sp)
-    p <- ggplot(d, aes(x, suit, colour = method)) +
+    p <- ggplot(d, aes(x, rate)) +
       geom_line(linewidth = 1) +
       geom_vline(data = s, aes(xintercept = Q05), linetype = 2, colour = "grey40") +
       geom_vline(data = s, aes(xintercept = median), linetype = 2, colour = "grey40") +
       geom_vline(data = s, aes(xintercept = Q95), linetype = 2, colour = "grey40") +
       facet_wrap(~variable, scales = "free_x") +
-      labs(x = "Microclimate temperature (°C)", y = "Suitability (cloglog)", title = sp, colour = NULL) +
-      theme_bw() +
-      theme(legend.position = "bottom")
+      labs(x = "Microclimate temperature (°C)", y = "Relative occurrence rate (max = 1)", title = sp) +
+      theme_bw()
     print(p)
   }
 }
@@ -181,12 +207,15 @@ if (test_run) {
 ####################################################################################
 ########################   2. Community-inferred temperature  ######################
 ####################################################################################
-niches_rc <- read.csv(file.path(out_dir, "Species_ThermalNiche_ResponseCurve_BIO5_BIO6.csv"))
-curves_rc <- readRDS(file.path(out_dir, "Species_ResponseCurves_BIO5_BIO6.rds"))
+niches_rc <- read.csv(file.path(out_dir, paste0("Species_ThermalNiche_ResponseCurve_BIO5_BIO6", method_tag, ".csv")))
+curves_rc <- readRDS(file.path(out_dir, paste0("Species_ResponseCurves_BIO5_BIO6", method_tag, ".rds")))
 
-# Species value used for CIT: the optimum is truncated for monotonic curves
-# (edge_opt), so the curve mean is the default; swap for "median" or "optimum".
-niche_value <- "mean"
+# Species value used for CIT: the median, as in script 07. It is less pulled by
+# curve tails cut off at min_eff_n than the mean, and stable unlike the optimum
+# (truncated for monotonic curves (edge_opt), jumps between peaks of bimodal
+# curves). CITs from the curve mean and optimum are kept as sensitivity checks
+# (*_mean, *_opt).
+niche_value <- "median"
 
 norm_name <- function(x) tolower(trimws(gsub("[_ ]+", " ", x)))
 
@@ -196,10 +225,19 @@ sp_match <- sp_match[sp_match$used_in_cit & sp_match$match_type != "exact", ]
 syn_fr2sdm <- setNames(sp_match$sdm_species, sp_match$fr_species)
 fr_to_sdm <- function(x) ifelse(x %in% names(syn_fr2sdm), unname(syn_fr2sdm[x]), x)
 
+# Optimum sensitivity check: species whose optimum lies at the edge of the curve
+# (edge_opt, curve still rising where the background data end) have no real
+# optimum, only the cut-off temperature. They would pull the optimum CIT toward
+# that cut-off, so their optimum is set to NA and they are left out of *_opt
+# only (per variable: a species flagged for BIO5 still counts in CIT_BIO6_opt).
+# They stay in the main (median) CIT and the mean check, as their median and
+# mean are still meaningful.
 niche_wide <- niches_rc %>%
-  mutate(species_key = norm_name(species)) %>%
-  dplyr::select(species_key, variable, value = all_of(niche_value), width) %>%
-  pivot_wider(names_from = variable, values_from = c(value, width))
+  mutate(species_key = norm_name(species),
+         optimum = ifelse(edge_opt, NA, optimum)) %>%
+  dplyr::select(species_key, variable, value = all_of(niche_value), width,
+                sens_mean = mean, sens_opt = optimum) %>%
+  pivot_wider(names_from = variable, values_from = c(value, width, sens_mean, sens_opt))
 
 # Vegetation data, layers and 9999 values handled as in 07: herb (H, SH) and
 # shrub (S) layer; 9999 = not surveyed / not monitored -> no presence, kept in
@@ -244,7 +282,11 @@ plot_species <- veg %>%
   summarise(herb = any(layer %in% c("H", "SH")), .groups = "drop") %>%
   inner_join(niche_wide, by = "species_key")
 
-# Presence-absence CIT, unweighted and weighted by inverse niche width
+# Presence-absence CIT, unweighted and weighted by inverse niche width;
+# sensitivity: unweighted CIT from the curve mean (*_mean) and optimum (*_opt).
+# *_opt averages over the species with a real optimum (edge_opt species are NA,
+# see above); n_species_opt_* = number of species used, NA if none.
+mean_or_na <- function(x) if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
 cit_from <- function(d) {
   d %>%
     group_by(sample) %>%
@@ -254,6 +296,12 @@ cit_from <- function(d) {
       CIT_BIO6 = mean(value_BIO6),
       CIT_BIO5_w = weighted.mean(value_BIO5, 1 / width_BIO5),
       CIT_BIO6_w = weighted.mean(value_BIO6, 1 / width_BIO6),
+      CIT_BIO5_mean = mean(sens_mean_BIO5),
+      CIT_BIO6_mean = mean(sens_mean_BIO6),
+      CIT_BIO5_opt = mean_or_na(sens_opt_BIO5),
+      CIT_BIO6_opt = mean_or_na(sens_opt_BIO6),
+      n_species_opt_BIO5 = sum(!is.na(sens_opt_BIO5)),
+      n_species_opt_BIO6 = sum(!is.na(sens_opt_BIO6)),
       .groups = "drop"
     )
 }
@@ -269,6 +317,11 @@ cit_rc <- cit_from(plot_species) %>%
   mutate(
     across(starts_with("CIT") & ends_with("_herb"),
            ~ ifelse(!is.na(n_species_herb) & n_species_herb >= min_species, .x, NA)),
+    # Optimum check: same minimum, counted over the species with a real optimum
+    CIT_BIO5_opt = ifelse(n_species_opt_BIO5 >= min_species, CIT_BIO5_opt, NA),
+    CIT_BIO6_opt = ifelse(n_species_opt_BIO6 >= min_species, CIT_BIO6_opt, NA),
+    CIT_BIO5_opt_herb = ifelse(n_species_opt_BIO5_herb >= min_species, CIT_BIO5_opt_herb, NA),
+    CIT_BIO6_opt_herb = ifelse(n_species_opt_BIO6_herb >= min_species, CIT_BIO6_opt_herb, NA),
     # sample = "EU_xxx_plot_survey": split back into plotID and survey type
     plotID = sub("_[^_]+$", "", sample),
     surveyTyp = sub("^.*_", "", sample)
@@ -282,15 +335,31 @@ cit_rc %>%
     mean_diff_BIO6 = mean(CIT_BIO6 - CIT_BIO6_herb, na.rm = TRUE)
   )
 
+# Sensitivity: CIT from the curve median (main) vs mean and optimum.
+# Mean difference = sensitivity - main. The optimum CIT is NA in plot-surveys
+# where all species are edge_opt, so those are skipped.
+lapply(c(mean = "_mean", optimum = "_opt"), function(s) {
+  cit_rc %>%
+    summarise(
+      r_BIO5 = cor(CIT_BIO5, .data[[paste0("CIT_BIO5", s)]], use = "complete.obs"),
+      r_BIO6 = cor(CIT_BIO6, .data[[paste0("CIT_BIO6", s)]], use = "complete.obs"),
+      mean_diff_BIO5 = mean(.data[[paste0("CIT_BIO5", s)]] - CIT_BIO5, na.rm = TRUE),
+      mean_diff_BIO6 = mean(.data[[paste0("CIT_BIO6", s)]] - CIT_BIO6, na.rm = TRUE)
+    )
+})
+# Share of species left out of the optimum check, per variable
+niches_rc %>% group_by(variable) %>% summarise(n = n(), n_edge_opt = sum(edge_opt))
+
 save(cit_rc, niches_rc, plot_species, not_monitored, not_surveyed,
-     file = "I:/DATA/output/CIT/CIT_SDMresponse_BIO5_BIO6.RData")
+     file = paste0("I:/DATA/output/CIT/CIT_SDMresponse_BIO5_BIO6", method_tag, ".RData"))
 
 ####################################################################################
 ################   3. Bootstrapped floristic temperature (De Frenne 2013)  ##########
 ####################################################################################
 # As in script 07, but each species' temperature draw comes from its response
-# curve (grid values drawn with probability proportional to suitability), which
-# is closer to De Frenne et al. (2013) who also used response curves.
+# realised curve (grid values drawn with probability proportional to the rate;
+# NA = outside the background support -> 0), which is closer to De Frenne et
+# al. (2013) who also used response curves.
 # Note: BIO5 and BIO6 are drawn independently here (no paired locations as in 07).
 n_boot <- 500
 
@@ -300,7 +369,7 @@ sp_keys <- norm_name(names(curve_list))
 draws <- lapply(c(BIO5 = "BIO5", BIO6 = "BIO6"), function(v) {
   m <- t(sapply(curve_list, function(d) {
     d <- d[d$variable == v, ]
-    sample(d$x, n_boot, replace = TRUE, prob = d$suit_pdp)
+    sample(d$x, n_boot, replace = TRUE, prob = ifelse(is.na(d$rate), 0, d$rate))
   }))
   rownames(m) <- sp_keys
   m
@@ -338,7 +407,8 @@ ft_summary_rc <- ft_boot_rc %>%
     list(mean = mean, lo = ~ quantile(.x, 0.025), hi = ~ quantile(.x, 0.975))
   ), .groups = "drop")
 
-save(ft_boot_rc, ft_summary_rc, file = "I:/DATA/output/CIT/FloristicTemp_boot_SDMresponse_BIO5_BIO6.RData")
+save(ft_boot_rc, ft_summary_rc,
+     file = paste0("I:/DATA/output/CIT/FloristicTemp_boot_SDMresponse_BIO5_BIO6", method_tag, ".RData"))
 
 ####################################################################################
 #################   4. Compare with the range-sampling CIT (script 07)  ############
